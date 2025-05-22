@@ -4,11 +4,25 @@
 """
 
 import os
+import logging
 from typing import Dict, Any
 from dotenv import load_dotenv
 
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # 加载环境变量
-load_dotenv()
+env_path = os.path.join(os.getcwd(), '.env')
+logger.info(f"尝试加载环境变量文件: {env_path}")
+load_dotenv(env_path)
+
+# 检查 API 密钥
+api_key = os.getenv("OPENAI_API_KEY")
+if api_key:
+    logger.info("成功加载 OPENAI_API_KEY")
+else:
+    logger.error("未找到 OPENAI_API_KEY")
 
 # LLM 配置
 LLM_CONFIG = {
@@ -35,7 +49,7 @@ AGENT_CONFIG = {
 1. 分析用户需求并创建合适的 Issue
 2. 审查代码提交，确保代码质量和功能完整性
 3. 监控代码库状态，及时发现问题
-4. 与编码员代理协作，确保项目顺利进行""",
+4. 与评论员代理协作，确保项目顺利进行""",
     },
     "coder": {
         "name": "Coder",

@@ -19,7 +19,8 @@ class LLMManager:
         Args:
             api_key: OpenAI API 密钥
         """
-        self.client = openai.OpenAI(api_key=api_key)
+        # 设置 API 密钥
+        openai.api_key = api_key
         logger.info("初始化 LLM 管理器")
     
     async def analyze_requirements(self, requirements: str) -> List[Dict[str, str]]:
@@ -32,7 +33,7 @@ class LLMManager:
             Issue 列表
         """
         try:
-            response = await self.client.chat.completions.create(
+            response = await openai.ChatCompletion.acreate(
                 model=LLM_CONFIG["model"],
                 messages=[
                     {"role": "system", "content": "你是一个需求分析师，负责将用户需求分解为具体的开发任务。"},
@@ -63,7 +64,7 @@ class LLMManager:
             审查结果
         """
         try:
-            response = await self.client.chat.completions.create(
+            response = await openai.ChatCompletion.acreate(
                 model=LLM_CONFIG["model"],
                 messages=[
                     {"role": "system", "content": "你是一个代码审查员，负责审查代码质量和功能完整性。"},
@@ -106,7 +107,7 @@ Issue: {issue['title']}
             生成的代码
         """
         try:
-            response = await self.client.chat.completions.create(
+            response = await openai.ChatCompletion.acreate(
                 model=LLM_CONFIG["model"],
                 messages=[
                     {"role": "system", "content": "你是一个专业的程序员，负责实现代码功能。"},

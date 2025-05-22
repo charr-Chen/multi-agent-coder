@@ -31,8 +31,13 @@ async def main():
         # 初始化 Git 管理器
         git_manager = GitManager(repo_path)
         
+        # 获取 API 密钥
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("未设置 OPENAI_API_KEY 环境变量")
+        
         # 初始化 LLM 管理器
-        llm_manager = LLMManager(os.getenv("OPENAI_API_KEY"))
+        llm_manager = LLMManager(api_key)
         
         # 创建评论员代理
         commenter = CommenterAgent(git_manager, llm_manager)

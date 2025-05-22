@@ -1,20 +1,66 @@
 # Multi-Agent Coder
 
-一个基于多智能体的代码协作系统，模拟了代码审查和任务分配的工作流程。
+基于多智能体协作的代码生成系统，模拟真实开发团队的协作过程。
 
-## 功能特点
+## 系统组件
 
-- 多智能体协作：包含评论员（Commenter）和编码员（Coder）两种角色
-- 任务管理：支持任务的创建、分配和状态跟踪
-- 代码审查：模拟代码审查流程
-- 数据库持久化：使用 SQLite 存储任务信息
-- 日志记录：详细的运行日志
+### 评论员代理 (Commenter Agent)
+- 基于 LLM 的代理，负责确定开发任务
+- 持续监控代码库状态
+- 创建和管理 Issue
+- 审查代码提交
+- 决定任务完成状态
 
-## 系统架构
+### 编码员代理 (Coder Agents)
+- 基于 LLM 的代理，负责实现代码
+- 异步监控和获取任务
+- 实现代码并提交
+- 处理代码冲突
+- 与评论员交互进行代码审查
 
-- `CommenterAgent`: 负责创建任务和审查代码
-- `CoderAgent`: 负责实现任务和提交代码
-- SQLite 数据库：存储任务信息和状态
+### 代码库 (Code Base)
+- Git 仓库作为协调中心
+- 支持 Issue 跟踪
+- 管理代码提交
+- 处理并发冲突
+
+## 工作流程
+
+1. 用户准备一个 Git 仓库（新建或现有）
+2. 用户向评论员代理描述需求
+3. 评论员代理开始运行：
+   - 持续添加新的 Issue
+   - 审查代码提交
+   - 监控代码库状态
+4. 编码员代理在后台运行：
+   - 持续检查未解决的 Issue
+   - 获取并锁定任务
+   - 实现代码并提交
+   - 处理代码冲突
+5. 所有操作都是异步并发的：
+   - 评论员代理同时进行代码审查和 Issue 管理
+   - 编码员代理同时进行代码实现和提交
+   - 自动处理 Git 冲突
+
+## 项目结构
+
+```
+multi-agent-coder/
+├── run.py                 # 运行脚本
+├── src/
+│   └── multi_agent_coder/
+│       ├── __init__.py
+│       ├── main.py
+│       ├── config.py      # 配置文件
+│       ├── git_utils.py   # Git 操作工具
+│       └── agents/
+│           ├── __init__.py
+│           ├── commenter.py  # 评论员代理
+│           └── coder.py      # 编码员代理
+├── README.md
+├── requirements.txt
+└── .gitignore
+```
 
 ## 安装
 
@@ -31,31 +77,36 @@ pip install -r requirements.txt
 
 ## 使用方法
 
-运行主程序：
+1. 准备 Git 仓库：
 ```bash
-python src/multi_agent_coder/main.py
+# 新建仓库
+git init
+# 或使用现有仓库
+git clone <repository-url>
 ```
 
-## 项目结构
+2. 运行系统：
+```bash
+python run.py
+```
 
-```
-multi-agent-coder/
-├── src/
-│   └── multi_agent_coder/
-│       ├── main.py
-│       └── agents.py
-├── README.md
-├── requirements.txt
-└── .gitignore
-```
+## 依赖
+
+- Python 3.9+
+- GitPython: Git 操作
+- aiofiles: 异步文件操作
+- openai: LLM 接口
+- python-dotenv: 环境变量管理
 
 ## 开发计划
 
-- [ ] 添加更复杂的代码审查逻辑
-- [ ] 实现实际的代码生成功能
-- [ ] 添加任务优先级
-- [ ] 实现任务重试机制
-- [ ] 添加更多的任务状态
+- [ ] 实现 Git 操作工具
+- [ ] 完善 Issue 跟踪系统
+- [ ] 添加代码冲突处理
+- [ ] 实现 LLM 接口
+- [ ] 添加配置文件支持
+- [ ] 改进错误处理
+- [ ] 添加日志系统
 
 ## 贡献
 

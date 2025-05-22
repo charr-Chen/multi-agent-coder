@@ -37,3 +37,15 @@ ENV/
 
 # Logs
 *.log
+
+# Environment variables
+.env
+.env.*
+
+# Project specific
+tasks.json  # 任务数据文件
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/

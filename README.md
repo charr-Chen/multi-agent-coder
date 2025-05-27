@@ -46,11 +46,10 @@
 
 ```
 multi-agent-coder/
-├── run.py                 # 运行脚本
+├── run.py                 # 主入口和运行脚本
 ├── src/
 │   └── multi_agent_coder/
 │       ├── __init__.py
-│       ├── main.py
 │       ├── config.py      # 配置文件
 │       ├── git_utils.py   # Git 操作工具
 │       └── agents/

@@ -1,5 +1,130 @@
 # Multi-Agent Coder
 
+[English](#english) | [简体中文](#简体中文)
+
+<a name="english"></a>
+# Multi-Agent Coder
+
+A code generation system based on multi-agent collaboration, simulating real development team cooperation.
+
+## System Components
+
+### Commenter Agent
+- LLM-based agent responsible for determining development tasks
+- Continuously monitors codebase status
+- Creates and manages issues
+- Reviews code submissions
+- Determines task completion status
+
+### Coder Agents
+- LLM-based agents responsible for implementing code
+- Asynchronously monitor and acquire tasks
+- Implement code and submit changes
+- Handle code conflicts
+- Interact with commenter agent for code review
+
+### Code Base
+- Git repository as coordination center
+- Supports issue tracking
+- Manages code submissions
+- Handles concurrent conflicts
+
+## Workflow
+
+1. User prepares a Git repository (new or existing)
+2. User describes requirements to the commenter agent
+3. Commenter agent starts running:
+   - Continuously adds new issues
+   - Reviews code submissions
+   - Monitors codebase status
+4. Coder agents run in the background:
+   - Continuously check for unresolved issues
+   - Grab and lock tasks
+   - Implement code and submit
+   - Handle code conflicts
+5. All operations are asynchronous and concurrent:
+   - Commenter agent simultaneously performs code review and issue management
+   - Coder agents simultaneously implement and submit code
+   - Automatically handle Git conflicts
+
+## Project Structure
+
+```
+multi-agent-coder/
+├── run.py                 # Main entry and running script
+├── src/
+│   └── multi_agent_coder/
+│       ├── __init__.py
+│       ├── config.py      # Configuration file
+│       ├── git_utils.py   # Git operation tools
+│       └── agents/
+│           ├── __init__.py
+│           ├── commenter.py  # Commenter agent
+│           └── coder.py      # Coder agent
+├── README.md
+├── requirements.txt
+└── .gitignore
+```
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/charr-Chen/multi-agent-coder.git
+cd multi-agent-coder
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+1. Prepare Git repository:
+```bash
+# Create new repository
+git init
+# Or use existing repository
+git clone <repository-url>
+```
+
+2. Run the system:
+```bash
+python run.py
+```
+
+## Dependencies
+
+- Python 3.9+
+- GitPython: Git operations
+- aiofiles: Asynchronous file operations
+- openai: LLM interface
+- python-dotenv: Environment variable management
+
+## Development Plan
+
+- [ ] Implement Git operation tools
+- [ ] Improve issue tracking system
+- [ ] Add code conflict handling
+- [ ] Implement LLM interface
+- [ ] Add configuration file support
+- [ ] Improve error handling
+- [ ] Add logging system
+
+## Contributing
+
+Issues and Pull Requests are welcome!
+
+## License
+
+MIT License
+
+---
+
+<a name="简体中文"></a>
+# Multi-Agent Coder
+
 基于多智能体协作的代码生成系统，模拟真实开发团队的协作过程。
 
 ## 系统组件

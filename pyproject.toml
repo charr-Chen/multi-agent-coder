@@ -3,8 +3,17 @@ name = "multi-agent-coder"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.9"
-dependencies = []
+requires-python = ">=3.13"
+dependencies = [
+    "aiofiles>=24.1.0",
+    "gitpython>=3.1.44",
+    "openai>=1.82.0",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=1.0.0",
+    "python-dotenv>=1.1.0",
+    "setuptools>=80.9.0",
+    "wheel>=0.45.1",
+]
 
 [build-system]
 requires = ["setuptools>=42", "wheel"]

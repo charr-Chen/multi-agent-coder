@@ -8,6 +8,7 @@ aiofiles==23.2.1
 GitPython==3.1.42
 openai==1.12.0
 python-dotenv==1.0.1
+aioconsole==0.8.1
 
 # 开发依赖
 pytest==8.0.2     # 单元测试

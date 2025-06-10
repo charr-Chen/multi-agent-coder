@@ -24,6 +24,7 @@ wheels/
 venv/
 env/
 ENV/
+.venv/
 
 # IDE
 .idea/
@@ -31,8 +32,7 @@ ENV/
 *.swp
 *.swo
 
-# Database
-*.db
+# Database (if any external databases are used)
 *.sqlite3
 
 # Logs
@@ -44,8 +44,21 @@ ENV/
 
 # Project specific
 tasks.json  # 任务数据文件
+.issues.json  # Issue跟踪文件
 
 # Test coverage
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Testing playground (keep structure but ignore content changes)
+agent_playground/*
+!agent_playground/.gitkeep
+
+# Agent repositories (keep structure but ignore content changes)
+agent_repos/*/src/
+agent_repos/*/.git/
+agent_repos/*/logs/
+# 忽略代理仓库目录，它们是独立的git仓库
+agent_playground/
+agent_repos/

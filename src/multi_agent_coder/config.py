@@ -38,6 +38,10 @@ SYSTEM_CONFIG = {
     "check_interval": int(os.getenv("CHECK_INTERVAL", "60")),  # 秒
     "review_interval": int(os.getenv("REVIEW_INTERVAL", "30")),  # 秒
     "work_interval": int(os.getenv("WORK_INTERVAL", "10")),  # 秒
+    # 新增多仓库配置
+    "playground_repo": os.getenv("PLAYGROUND_REPO", ""),  # 默认为空，使用本地仓库
+    "agent_repos_dir": os.getenv("AGENT_REPOS_DIR", "./agent_repos"),
+    "use_separate_repos": os.getenv("USE_SEPARATE_REPOS", "true").lower() == "true",
 }
 
 # 代理配置

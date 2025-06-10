@@ -35,7 +35,7 @@ class GitManager:
             with open(self.issues_file, "w") as f:
                 json.dump({"issues": []}, f)
             # 将 issues 文件添加到 Git
-            self.repo.index.add([self.issues_file])
+            self.repo.index.add([".issues.json"])  # 使用相对路径
             self.repo.index.commit("初始化 Issue 跟踪系统")
     
     def _load_issues(self) -> Dict[str, List[Dict[str, Any]]]:
@@ -81,20 +81,20 @@ class GitManager:
         # 提交更改
         await self.commit_changes(
             f"创建 Issue: {title}",
-            [self.issues_file]
+            [".issues.json"]  # 使用相对路径
         )
         
         logger.info(f"创建 Issue: {title}")
         return issue
     
     async def get_open_issues(self) -> List[Dict[str, Any]]:
-        """获取所有开放的 Issue
+        """获取所有开放的 Issue（包括open和assigned状态）
         
         Returns:
             Issue 列表
         """
         data = self._load_issues()
-        return [issue for issue in data["issues"] if issue["status"] == "open"]
+        return [issue for issue in data["issues"] if issue["status"] in ["open", "assigned"]]
     
     async def assign_issue(self, issue_id: str, assignee: str) -> bool:
         """分配 Issue 给指定代理
@@ -110,12 +110,13 @@ class GitManager:
         for issue in data["issues"]:
             if issue["id"] == issue_id and issue["status"] == "open":
                 issue["assigned_to"] = assignee
+                issue["status"] = "assigned"
                 self._save_issues(data)
                 
                 # 提交更改
                 await self.commit_changes(
                     f"分配 Issue {issue_id} 给 {assignee}",
-                    [self.issues_file]
+                    [".issues.json"]  # 使用相对路径
                 )
                 
                 logger.info(f"分配 Issue {issue_id} 给 {assignee}")
@@ -144,7 +145,7 @@ class GitManager:
                 # 提交更改
                 await self.commit_changes(
                     f"更新 Issue {issue_id} 状态为 {status}",
-                    [self.issues_file]
+                    [".issues.json"]  # 使用相对路径
                 )
                 
                 logger.info(f"更新 Issue {issue_id} 状态为 {status}")
@@ -177,6 +178,16 @@ class GitManager:
             是否推送成功
         """
         try:
+            # 检查是否有远程仓库
+            if not self.repo.remotes:
+                logger.debug("没有配置远程仓库，跳过推送操作")
+                return True
+            
+            # 检查是否有origin远程仓库
+            if 'origin' not in [remote.name for remote in self.repo.remotes]:
+                logger.debug("没有配置origin远程仓库，跳过推送操作")
+                return True
+            
             self.repo.remotes.origin.push()
             logger.info("推送更改到远程仓库")
             return True
@@ -191,6 +202,16 @@ class GitManager:
             是否拉取成功
         """
         try:
+            # 检查是否有远程仓库
+            if not self.repo.remotes:
+                logger.debug("没有配置远程仓库，跳过拉取操作")
+                return True
+            
+            # 检查是否有origin远程仓库
+            if 'origin' not in [remote.name for remote in self.repo.remotes]:
+                logger.debug("没有配置origin远程仓库，跳过拉取操作")
+                return True
+            
             self.repo.remotes.origin.pull()
             logger.info("从远程仓库拉取更改")
             return True

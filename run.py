@@ -105,15 +105,15 @@ async def main():
             
             # 初始化 Git 管理器
             git_manager = GitManager(repo_path)
-            
-            # 创建评论员代理
-            commenter = CommenterAgent(git_manager, llm_manager)
-            
-            # 创建编码员代理
-            coders = [
-                CoderAgent(git_manager, llm_manager, f"coder_{i}")
-                for i in range(config["system"]["num_coders"])
-            ]
+        
+        # 创建评论员代理
+        commenter = CommenterAgent(git_manager, llm_manager)
+        
+        # 创建编码员代理
+        coders = [
+            CoderAgent(git_manager, llm_manager, f"coder_{i}")
+            for i in range(config["system"]["num_coders"])
+        ]
         
         # 启动所有代理
         tasks = [

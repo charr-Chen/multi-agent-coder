@@ -109,7 +109,7 @@ class LLMManager:
                 
                 # Fallback: 手动解析
                 lines = content.split('\n')
-                issues = []
+            issues = []
                 current_title = None
                 current_desc = []
                 
@@ -134,7 +134,7 @@ class LLMManager:
                     })
                 
                 logger.info(f"✅ Fallback解析出 {len(issues)} 个任务")
-                return issues
+            return issues
                 
         except Exception as e:
             logger.error(f"❌ 分析需求时出错: {e}")

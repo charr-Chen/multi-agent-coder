@@ -109,7 +109,7 @@ class LLMManager:
                 
                 # Fallback: 手动解析
                 lines = content.split('\n')
-            issues = []
+                issues = []
                 current_title = None
                 current_desc = []
                 

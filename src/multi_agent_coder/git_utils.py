@@ -152,7 +152,7 @@ class GitManager:
                 return True
         return False
     
-    async def commit_changes(self, message: str, files: List[str]) -> bool:
+    async def commit_changes(self, message: str, files: List[str]) -> str:
         """提交代码更改
         
         Args:
@@ -160,16 +160,16 @@ class GitManager:
             files: 要提交的文件列表
             
         Returns:
-            是否提交成功
+            提交的hash值，失败时返回空字符串
         """
         try:
             self.repo.index.add(files)
-            self.repo.index.commit(message)
+            commit = self.repo.index.commit(message)
             logger.info(f"提交更改: {message}")
-            return True
+            return commit.hexsha
         except GitCommandError as e:
             logger.error(f"提交失败: {e}")
-            return False
+            return ""
     
     async def push_changes(self) -> bool:
         """推送代码到远程仓库
@@ -252,4 +252,134 @@ class GitManager:
                     raise
         except Exception as e:
             logger.error(f"解决冲突失败: {e}")
+            return False
+    
+    async def create_branch(self, branch_name: str) -> bool:
+        """创建并切换到新分支
+        
+        Args:
+            branch_name: 分支名称
+            
+        Returns:
+            是否创建成功
+        """
+        try:
+            # 检查分支是否已存在
+            if branch_name in [branch.name for branch in self.repo.branches]:
+                logger.info(f"分支 {branch_name} 已存在，切换到该分支")
+                await self.checkout_branch(branch_name)
+                return True
+            
+            # 创建新分支
+            new_branch = self.repo.create_head(branch_name)
+            new_branch.checkout()
+            logger.info(f"创建并切换到分支: {branch_name}")
+            return True
+        except Exception as e:
+            logger.error(f"创建分支失败: {e}")
+            return False
+    
+    async def checkout_branch(self, branch_name: str) -> bool:
+        """切换到指定分支
+        
+        Args:
+            branch_name: 分支名称
+            
+        Returns:
+            是否切换成功
+        """
+        try:
+            # 检查分支是否存在
+            if branch_name not in [branch.name for branch in self.repo.branches]:
+                logger.error(f"分支 {branch_name} 不存在")
+                return False
+            
+            # 切换分支
+            self.repo.heads[branch_name].checkout()
+            logger.info(f"切换到分支: {branch_name}")
+            return True
+        except Exception as e:
+            logger.error(f"切换分支失败: {e}")
+            return False
+    
+    async def delete_branch(self, branch_name: str) -> bool:
+        """删除分支
+        
+        Args:
+            branch_name: 分支名称
+            
+        Returns:
+            是否删除成功
+        """
+        try:
+            # 检查分支是否存在
+            if branch_name not in [branch.name for branch in self.repo.branches]:
+                logger.debug(f"分支 {branch_name} 不存在，无需删除")
+                return True
+            
+            # 不能删除当前分支
+            if self.repo.active_branch.name == branch_name:
+                logger.warning(f"不能删除当前分支: {branch_name}")
+                return False
+            
+            # 删除分支
+            self.repo.delete_head(branch_name, force=True)
+            logger.info(f"删除分支: {branch_name}")
+            return True
+        except Exception as e:
+            logger.error(f"删除分支失败: {e}")
+            return False
+    
+    async def get_current_branch(self) -> str:
+        """获取当前分支名称
+        
+        Returns:
+            当前分支名称
+        """
+        try:
+            return self.repo.active_branch.name
+        except Exception as e:
+            logger.error(f"获取当前分支失败: {e}")
+            return "main"
+    
+    async def list_branches(self) -> List[str]:
+        """列出所有分支
+        
+        Returns:
+            分支名称列表
+        """
+        try:
+            return [branch.name for branch in self.repo.branches]
+        except Exception as e:
+            logger.error(f"列出分支失败: {e}")
+            return []
+    
+    async def merge_branch(self, branch_name: str, message: str = None) -> bool:
+        """合并分支到当前分支
+        
+        Args:
+            branch_name: 要合并的分支名称
+            message: 合并提交信息
+            
+        Returns:
+            是否合并成功
+        """
+        try:
+            # 检查分支是否存在
+            if branch_name not in [branch.name for branch in self.repo.branches]:
+                logger.error(f"分支 {branch_name} 不存在")
+                return False
+            
+            # 获取要合并的分支
+            branch_to_merge = self.repo.heads[branch_name]
+            
+            # 执行合并
+            if message is None:
+                message = f"Merge branch '{branch_name}'"
+            
+            self.repo.git.merge(branch_to_merge, m=message)
+            logger.info(f"合并分支 {branch_name} 到 {self.repo.active_branch.name}")
+            return True
+        except Exception as e:
+            logger.error(f"合并分支失败: {e}")
             return False 

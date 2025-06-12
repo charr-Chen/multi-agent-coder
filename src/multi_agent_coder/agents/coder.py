@@ -30,6 +30,7 @@ class CoderAgent:
         self.config = AGENT_CONFIG["coder"]
         self.current_issue = None
         self.playground_git_manager = None  # playground仓库管理器，用于访问Issues
+        self.collaboration_manager = None  # 协作管理器
         logger.info(f"初始化编码员代理: {agent_id}")
     
     def set_playground_git_manager(self, playground_git_manager: GitManager):
@@ -40,6 +41,15 @@ class CoderAgent:
         """
         self.playground_git_manager = playground_git_manager
         logger.info(f"{self.agent_id} 设置playground仓库管理器")
+    
+    def set_collaboration_manager(self, collaboration_manager):
+        """设置协作管理器
+        
+        Args:
+            collaboration_manager: 协作管理器实例
+        """
+        self.collaboration_manager = collaboration_manager
+        logger.info(f"{self.agent_id} 设置协作管理器")
     
     def get_issues_git_manager(self) -> GitManager:
         """获取用于访问Issues的Git管理器
@@ -104,50 +114,85 @@ class CoderAgent:
             
             # 创建或更新文件
             file_path = f"src/{issue['id']}.py"
-            full_file_path = os.path.join(self.git_manager.repo_path, file_path)
-            logger.info(f"📁 {self.agent_id} 准备写入文件: {full_file_path}")
             
-            # 确保目录存在
-            os.makedirs(os.path.dirname(full_file_path), exist_ok=True)
-            logger.debug(f"📂 {self.agent_id} 目录已创建: {os.path.dirname(full_file_path)}")
-            
-            # 写入文件
-            with open(full_file_path, "w", encoding='utf-8') as f:
-                f.write(code)
-            logger.info(f"💾 {self.agent_id} 文件写入成功: {file_path}")
-            
-            # 提交代码到agent自己的仓库
-            commit_message = f"实现 Issue {issue['id']}: {issue['title']}"
-            logger.info(f"📤 {self.agent_id} 准备提交代码: {commit_message}")
-            
-            if await self.git_manager.commit_changes(commit_message, [file_path]):
-                logger.info(f"✅ {self.agent_id} Git提交成功")
+            # 如果有协作管理器，使用Pull Request流程
+            if self.collaboration_manager:
+                logger.info(f"🔄 {self.agent_id} 使用Pull Request流程提交代码")
                 
-                # 如果使用多仓库模式，同步到playground
-                if hasattr(self, 'multi_repo_manager') and self.multi_repo_manager:
-                    logger.info(f"🔄 {self.agent_id} 开始同步到playground...")
-                    await self.multi_repo_manager.sync_agent_to_playground(self.agent_id)
-                    logger.info(f"✅ {self.agent_id} 已同步工作到playground")
-                else:
-                    # 单仓库模式，推送到远程
-                    logger.info(f"📤 {self.agent_id} 推送到远程仓库...")
-                    await self.git_manager.push_changes()
-                    logger.info(f"✅ {self.agent_id} 推送成功")
+                # 创建Pull Request
+                pr_title = f"实现 {issue['title']}"
+                pr_description = f"实现Issue #{issue['id']}: {issue['description']}"
+                code_changes = {file_path: code}
                 
-                # 更新 Issue 状态 (总是在playground仓库中更新)
-                logger.info(f"📝 {self.agent_id} 更新Issue状态为review...")
+                pr_id = await self.collaboration_manager.create_pull_request(
+                    issue_id=issue['id'],
+                    author=self.agent_id,
+                    title=pr_title,
+                    description=pr_description,
+                    code_changes=code_changes
+                )
+                
+                logger.info(f"🎉 {self.agent_id} 创建Pull Request: {pr_id}")
+                logger.info(f"⏳ 等待代码审核...")
+                
+                # 更新Issue状态为review
                 issues_git_manager = self.get_issues_git_manager()
                 await issues_git_manager.update_issue_status(
                     issue["id"],
                     "review",
-                    code
+                    f"Pull Request: {pr_id}"
                 )
-                logger.info(f"🎉 {self.agent_id} 完成Issue {issue['id']} 的实现")
+                
                 return True
             else:
-                logger.error(f"❌ {self.agent_id} Git提交失败")
-            
-            return False
+                # 传统流程：直接提交代码
+                logger.info(f"📤 {self.agent_id} 使用传统流程直接提交代码")
+                
+                full_file_path = os.path.join(self.git_manager.repo_path, file_path)
+                logger.info(f"📁 {self.agent_id} 准备写入文件: {full_file_path}")
+                
+                # 确保目录存在
+                os.makedirs(os.path.dirname(full_file_path), exist_ok=True)
+                logger.debug(f"📂 {self.agent_id} 目录已创建: {os.path.dirname(full_file_path)}")
+                
+                # 写入文件
+                with open(full_file_path, "w", encoding='utf-8') as f:
+                    f.write(code)
+                logger.info(f"💾 {self.agent_id} 文件写入成功: {file_path}")
+                
+                # 提交代码到agent自己的仓库
+                commit_message = f"实现 Issue {issue['id']}: {issue['title']}"
+                logger.info(f"📤 {self.agent_id} 准备提交代码: {commit_message}")
+                
+                commit_hash = await self.git_manager.commit_changes(commit_message, [file_path])
+                if commit_hash:
+                    logger.info(f"✅ {self.agent_id} Git提交成功")
+                    
+                    # 如果使用多仓库模式，同步到playground
+                    if hasattr(self, 'multi_repo_manager') and self.multi_repo_manager:
+                        logger.info(f"🔄 {self.agent_id} 开始同步到playground...")
+                        await self.multi_repo_manager.sync_agent_to_playground(self.agent_id)
+                        logger.info(f"✅ {self.agent_id} 已同步工作到playground")
+                    else:
+                        # 单仓库模式，推送到远程
+                        logger.info(f"📤 {self.agent_id} 推送到远程仓库...")
+                        await self.git_manager.push_changes()
+                        logger.info(f"✅ {self.agent_id} 推送成功")
+                    
+                    # 更新 Issue 状态 (总是在playground仓库中更新)
+                    logger.info(f"📝 {self.agent_id} 更新Issue状态为review...")
+                    issues_git_manager = self.get_issues_git_manager()
+                    await issues_git_manager.update_issue_status(
+                        issue["id"],
+                        "review",
+                        code
+                    )
+                    logger.info(f"🎉 {self.agent_id} 完成Issue {issue['id']} 的实现")
+                    return True
+                else:
+                    logger.error(f"❌ {self.agent_id} Git提交失败")
+                
+                return False
         except Exception as e:
             logger.error(f"❌ {self.agent_id} 实现Issue时出错: {e}")
             import traceback
@@ -173,10 +218,11 @@ class CoderAgent:
             # 解决冲突
             if await self.get_issues_git_manager().resolve_conflicts():
                 # 提交解决后的代码
-                if await self.get_issues_git_manager().commit_changes(
+                commit_hash = await self.get_issues_git_manager().commit_changes(
                     "解决代码冲突",
                     ["src/*.py"]
-                ):
+                )
+                if commit_hash:
                     # 推送代码（如果有远程仓库的话）
                     try:
                         if self.get_issues_git_manager().repo.remotes:

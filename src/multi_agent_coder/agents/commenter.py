@@ -25,7 +25,17 @@ class CommenterAgent:
         self.git_manager = git_manager
         self.llm_manager = llm_manager
         self.config = AGENT_CONFIG["commenter"]
+        self.collaboration_manager = None  # 协作管理器
         logger.info("初始化评论员代理")
+    
+    def set_collaboration_manager(self, collaboration_manager):
+        """设置协作管理器
+        
+        Args:
+            collaboration_manager: 协作管理器实例
+        """
+        self.collaboration_manager = collaboration_manager
+        logger.info("评论员设置协作管理器")
     
     async def create_issue(self, title: str, description: str) -> Dict[str, Any]:
         """创建新的 Issue
@@ -181,6 +191,82 @@ class CommenterAgent:
         except Exception as e:
             logger.error(f"❌ 监控系统出错: {e}")
     
+    async def review_pull_requests(self) -> None:
+        """审查Pull Request
+        
+        持续审查开放的Pull Request。
+        """
+        if not self.collaboration_manager:
+            logger.warning("⚠️ 未设置协作管理器，无法审查Pull Request")
+            return
+        
+        logger.info("👀 开始审查Pull Requests...")
+        while True:
+            try:
+                logger.debug("📋 获取开放的Pull Requests...")
+                # 获取开放的Pull Request
+                prs = await self.collaboration_manager.get_open_pull_requests()
+                
+                if prs:
+                    logger.info(f"📝 发现 {len(prs)} 个开放的Pull Requests")
+                
+                for pr in prs:
+                    logger.info(f"🔍 审查Pull Request: {pr.pr_id}")
+                    logger.info(f"📋 PR标题: {pr.title}")
+                    logger.info(f"👤 作者: {pr.author}")
+                    logger.info(f"🌿 分支: {pr.branch_name}")
+                    
+                    # 审查代码
+                    approved = True
+                    comments = ""
+                    
+                    try:
+                        # 使用LLM审查代码
+                        for file_path, code_content in pr.code_changes.items():
+                            logger.info(f"📁 审查文件: {file_path}")
+                            
+                            # 构造Issue信息用于审查
+                            issue_info = {
+                                "id": pr.issue_id,
+                                "title": pr.title,
+                                "description": pr.description
+                            }
+                            
+                            review_result = await self.llm_manager.review_code(issue_info, code_content)
+                            
+                            if not review_result["approved"]:
+                                approved = False
+                                comments += f"文件 {file_path}: {review_result.get('comments', 'Code quality issues')}\n"
+                            else:
+                                logger.info(f"✅ 文件 {file_path} 审查通过")
+                    
+                    except Exception as e:
+                        logger.error(f"❌ 审查PR {pr.pr_id} 时出错: {e}")
+                        approved = False
+                        comments = f"审查过程中出现错误: {str(e)}"
+                    
+                    # 提交审查结果
+                    await self.collaboration_manager.review_pull_request(
+                        pr.pr_id,
+                        "commenter",
+                        approved,
+                        comments
+                    )
+                    
+                    if approved:
+                        logger.info(f"🎉 Pull Request {pr.pr_id} 审查通过并已合并")
+                    else:
+                        logger.info(f"❌ Pull Request {pr.pr_id} 审查未通过")
+                        logger.info(f"💬 审查意见: {comments}")
+                
+                # 休眠一段时间再检查
+                logger.debug("😴 PR审查休眠30秒...")
+                await asyncio.sleep(30)
+                
+            except Exception as e:
+                logger.error(f"❌ 审查Pull Requests时出错: {e}")
+                await asyncio.sleep(30)
+    
     async def review_issues(self) -> None:
         """审查 Issue
         
@@ -226,15 +312,26 @@ class CommenterAgent:
         # 创建监控和审查任务
         logger.info("📡 创建监控任务...")
         monitor_task = asyncio.create_task(self.monitor_repo())
-        logger.info("👀 创建审查任务...")
+        logger.info("👀 创建Issue审查任务...")
         review_task = asyncio.create_task(self.review_issues())
+        
+        tasks = [monitor_task, review_task]
+        
+        # 如果有协作管理器，添加PR审查任务
+        if self.collaboration_manager:
+            logger.info("🔄 创建Pull Request审查任务...")
+            pr_review_task = asyncio.create_task(self.review_pull_requests())
+            tasks.append(pr_review_task)
+            logger.info("✅ 启用Pull Request审查功能")
+        else:
+            logger.info("⚠️ 未启用Pull Request审查功能")
         
         try:
             logger.info("⚡ 评论员代理开始工作...")
-            # 等待任务完成
-            await asyncio.gather(monitor_task, review_task)
+            # 等待所有任务完成
+            await asyncio.gather(*tasks)
         except Exception as e:
             logger.error(f"❌ 评论员代理运行出错: {e}")
             # 取消所有任务
-            monitor_task.cancel()
-            review_task.cancel() 
+            for task in tasks:
+                task.cancel() 

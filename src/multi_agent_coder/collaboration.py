@@ -383,42 +383,19 @@ class CollaborationManager:
                 current_branch = await agent_git.get_current_branch()
                 logger.debug(f"🌿 agent {agent_id} 当前分支: {current_branch}")
                 
-                # 确保main分支存在
+                # 检查agent仓库状态，但不强制切换分支
                 branches = await agent_git.list_branches()
-                if "main" not in branches:
-                    logger.info(f"🆕 为agent {agent_id} 创建main分支")
-                    # 如果没有main分支，创建一个
-                    try:
-                        # 先确保有初始提交
-                        readme_path = os.path.join(agent_git.repo_path, "README.md")
-                        if not os.path.exists(readme_path):
-                            with open(readme_path, "w", encoding="utf-8") as f:
-                                f.write(f"# Agent {agent_id} Repository\n\nThis is the working repository for agent {agent_id}.\n")
-                            await agent_git.commit_changes("Initial commit", ["README.md"])
-                        
-                        # 创建main分支
-                        await agent_git.create_branch("main")
-                    except Exception as e:
-                        logger.warning(f"⚠️ 创建main分支失败: {e}")
+                logger.debug(f"📋 agent {agent_id} 分支列表: {branches}")
                 
-                # 如果不在main分支，需要安全地切换
-                if current_branch != "main":
-                    # 检查是否有未提交的更改
-                    try:
-                        # 先暂存所有更改
-                        agent_git.repo.git.stash("push", "--include-untracked", "-m", f"Auto stash before sync")
-                        logger.debug(f"💾 为agent {agent_id} 暂存未提交的更改")
-                    except Exception as e:
-                        logger.debug(f"暂存更改失败或无更改需要暂存: {e}")
-                    
-                    # 切换到main分支
-                    success = await agent_git.checkout_branch("main")
-                    if not success:
-                        logger.warning(f"⚠️ agent {agent_id} 切换到main分支失败，跳过同步")
-                        continue
+                # 对于新的独立agent工作空间，不需要强制切换分支
+                if current_branch == "main":
+                    logger.debug(f"✅ agent {agent_id} 已在main分支")
+                else:
+                    logger.debug(f"📝 agent {agent_id} 在工作分支: {current_branch}")
+                    # 不强制切换，让agent继续在当前分支工作
                 
-                # 从主仓库拉取最新代码
-                await self._sync_from_main_repo(agent_git)
+                # 跳过同步，使用独立的agent工作空间
+                logger.debug(f"📭 agent {agent_id} 使用独立工作空间，跳过同步")
                 
                 logger.info(f"✅ agent {agent_id} 同步完成")
                 

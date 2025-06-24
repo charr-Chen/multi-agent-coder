@@ -34,94 +34,75 @@ class MultiRepoManager:
         logger.info(f"初始化多仓库管理器: {agent_repos_dir}")
     
     async def setup_playground_repo(self) -> GitManager:
-        """设置主playground仓库（独立的协作空间，不复制用户项目内容）
+        """设置主playground仓库
         
         Returns:
             playground仓库的GitManager
         """
         try:
-            logger.info("创建独立的playground协作仓库")
-            
-            if os.path.exists(self.playground_path):
-                # 如果playground目录已存在，使用现有仓库
-                logger.info(f"使用现有playground仓库: {self.playground_path}")
+            # 如果没有指定远程仓库URL，直接创建本地仓库
+            if not self.playground_repo_url or self.playground_repo_url.strip() == "":
+                logger.info("未指定远程仓库，创建本地playground仓库")
+                if not os.path.exists(self.playground_path):
+                    os.makedirs(self.playground_path)
+                    repo = Repo.init(self.playground_path)
+                    logger.info(f"创建本地playground仓库: {self.playground_path}")
             else:
-                # 创建新的独立playground仓库，不复制用户项目内容
-                os.makedirs(self.playground_path)
-                
-                # 创建src目录用于存放所有生成的代码
-                src_dir = os.path.join(self.playground_path, "src")
-                os.makedirs(src_dir, exist_ok=True)
-                
-                # 初始化Git仓库
-                repo = Repo.init(self.playground_path)
-                logger.info(f"创建独立playground仓库: {self.playground_path}")
-                
-                # 创建README文件
-                readme_content = """# Multi-Agent Coder Playground
-
-这是一个多代理编程协作空间。
-
-## 目录结构
-- `src/` - 生成的代码文件
-- `.issues.json` - Issue管理文件
-- `.pull_requests.json` - Pull Request管理文件
-
-## 使用说明
-1. 所有agent生成的代码都会同步到这里
-2. Issues和Pull Requests在这里进行协作管理
-3. 这是一个独立的工作空间，不包含用户项目的原始文件
-"""
-                readme_file = os.path.join(self.playground_path, "README.md")
-                with open(readme_file, "w", encoding='utf-8') as f:
-                    f.write(readme_content)
-                
-                logger.info("创建playground README文件")
+                # 有远程仓库URL，尝试克隆或拉取
+                if os.path.exists(self.playground_path):
+                    # 如果目录已存在，尝试拉取最新代码
+                    repo = Repo(self.playground_path)
+                    if repo.remotes:
+                        try:
+                            repo.remotes.origin.pull()
+                            logger.info("拉取playground仓库最新代码")
+                        except Exception as e:
+                            logger.warning(f"拉取playground仓库失败，使用现有本地仓库: {e}")
+                    else:
+                        logger.info("使用现有本地playground仓库")
+                else:
+                    # 克隆playground仓库
+                    try:
+                        Repo.clone_from(self.playground_repo_url, self.playground_path)
+                        logger.info(f"克隆playground仓库: {self.playground_repo_url}")
+                    except Exception as e:
+                        logger.warning(f"克隆playground仓库失败，创建本地仓库: {e}")
+                        os.makedirs(self.playground_path)
+                        Repo.init(self.playground_path)
             
-            # 确保必要的文件存在
+            # 确保.issues.json文件存在
             issues_file = os.path.join(self.playground_path, ".issues.json")
             if not os.path.exists(issues_file):
                 import json
-                with open(issues_file, "w", encoding='utf-8') as f:
-                    json.dump({"issues": []}, f, indent=2)
+                with open(issues_file, "w") as f:
+                    json.dump({"issues": []}, f)
                 logger.info("创建.issues.json文件")
-            
-            # 确保.pull_requests.json文件存在
-            pr_file = os.path.join(self.playground_path, ".pull_requests.json")
-            if not os.path.exists(pr_file):
-                import json
-                with open(pr_file, "w", encoding='utf-8') as f:
-                    json.dump({"pull_requests": []}, f, indent=2)
-                logger.info("创建.pull_requests.json文件")
-            
-            # 确保src目录存在
-            src_dir = os.path.join(self.playground_path, "src")
-            os.makedirs(src_dir, exist_ok=True)
             
             self.playground_git_manager = GitManager(self.playground_path)
             return self.playground_git_manager
             
         except Exception as e:
             logger.error(f"设置playground仓库失败: {e}")
-            # 创建最小化的playground仓库
+            # 如果克隆失败，创建本地仓库
             if not os.path.exists(self.playground_path):
                 os.makedirs(self.playground_path)
-                src_dir = os.path.join(self.playground_path, "src")
-                os.makedirs(src_dir, exist_ok=True)
-                Repo.init(self.playground_path)
-                logger.info(f"创建最小化playground仓库: {self.playground_path}")
+                repo = Repo.init(self.playground_path)
+                # 尝试添加远程仓库（如果URL有效的话）
+                if self.playground_repo_url and self.playground_repo_url.strip():
+                    try:
+                        repo.create_remote("origin", self.playground_repo_url)
+                        logger.info(f"添加远程仓库: {self.playground_repo_url}")
+                    except Exception:
+                        logger.warning(f"无法添加远程仓库: {self.playground_repo_url}")
+                logger.info(f"创建本地playground仓库: {self.playground_path}")
             
-            # 确保必要文件存在
-            import json
+            # 确保.issues.json文件存在
             issues_file = os.path.join(self.playground_path, ".issues.json")
             if not os.path.exists(issues_file):
-                with open(issues_file, "w", encoding='utf-8') as f:
-                    json.dump({"issues": []}, f, indent=2)
-            
-            pr_file = os.path.join(self.playground_path, ".pull_requests.json")
-            if not os.path.exists(pr_file):
-                with open(pr_file, "w", encoding='utf-8') as f:
-                    json.dump({"pull_requests": []}, f, indent=2)
+                import json
+                with open(issues_file, "w") as f:
+                    json.dump({"issues": []}, f)
+                logger.info("创建.issues.json文件")
             
             self.playground_git_manager = GitManager(self.playground_path)
             return self.playground_git_manager
@@ -142,33 +123,25 @@ class MultiRepoManager:
                 # 如果目录已存在，使用现有仓库
                 logger.info(f"使用现有agent仓库: {agent_repo_path}")
             else:
-                # 从playground仓库复制初始内容
+                # 创建新的agent仓库目录
+                os.makedirs(agent_repo_path)
+                
+                # 初始化Git仓库
+                repo = Repo.init(agent_repo_path)
+                logger.info(f"初始化agent仓库: {agent_repo_path}")
+                
+                # 从playground仓库复制内容（排除Git元数据）
                 if self.playground_git_manager and os.path.exists(self.playground_path):
-                    # 不复制playground内容，创建独立工作空间
-                    os.makedirs(agent_repo_path)
-                    repo = Repo.init(agent_repo_path)
-                    
-                    # 创建src目录
-                    src_dir = os.path.join(agent_repo_path, "src")
-                    os.makedirs(src_dir, exist_ok=True)
-                    
-                    # 创建README
-                    readme_path = os.path.join(agent_repo_path, "README.md")
+                    await self._copy_repo_content(self.playground_path, agent_repo_path)
+                    logger.info(f"从playground复制内容到agent仓库: {agent_repo_path}")
+                
+                # 创建初始README文件
+                readme_path = os.path.join(agent_repo_path, "README.md")
+                if not os.path.exists(readme_path):
                     with open(readme_path, "w", encoding="utf-8") as f:
-                        f.write(f"# Agent {agent_id} Workspace\n\nIndependent workspace for code generation.\n")
-                    
-                    # 初始提交
-                    logger.info(f"从playground复制创建agent仓库: {agent_repo_path}")
-                else:
-                    # 创建新的空仓库
-                    os.makedirs(agent_repo_path)
-                    Repo.init(agent_repo_path)
-                    # 创建.issues.json文件
-                    import json
-                    issues_file = os.path.join(agent_repo_path, ".issues.json")
-                    with open(issues_file, "w") as f:
-                        json.dump({"issues": []}, f)
-                    logger.info(f"创建新的agent仓库: {agent_repo_path}")
+                        f.write(f"# Agent {agent_id} Repository\n\n")
+                        f.write(f"This is the working repository for agent {agent_id}.\n")
+                        f.write("This repository is automatically managed by the multi-agent coder system.\n")
             
             # 确保.issues.json文件存在
             issues_file = os.path.join(agent_repo_path, ".issues.json")
@@ -187,6 +160,73 @@ class MultiRepoManager:
         except Exception as e:
             logger.error(f"设置agent仓库失败: {e}")
             raise
+    
+    async def _copy_repo_content(self, src_path: str, dst_path: str):
+        """安全地复制仓库内容，排除Git元数据和冲突文件
+        
+        Args:
+            src_path: 源路径
+            dst_path: 目标路径
+        """
+        import fnmatch
+        
+        # 定义要忽略的文件和目录模式
+        ignore_patterns = [
+            '.git',
+            '.git/*',
+            '__pycache__',
+            '*.pyc',
+            '*.pyo',
+            '.DS_Store',
+            'Thumbs.db',
+            '.env',
+            '.env.*',
+            # 避免AgentGPT相关文件冲突
+            'db/*',
+            'next/*',
+            'platform/*',
+            'docker-compose.yml',
+            'setup.sh',
+            'setup.bat',
+            '.editorconfig',
+            '.gitattributes'
+        ]
+        
+        def should_ignore(path, name):
+            """检查是否应该忽略某个路径"""
+            # 检查完整路径
+            full_path = os.path.join(path, name)
+            rel_path = os.path.relpath(full_path, src_path)
+            
+            for pattern in ignore_patterns:
+                if fnmatch.fnmatch(name, pattern) or fnmatch.fnmatch(rel_path, pattern):
+                    return True
+            return False
+        
+        # 递归复制文件，但排除指定的模式
+        for root, dirs, files in os.walk(src_path):
+            # 过滤要忽略的目录
+            dirs[:] = [d for d in dirs if not should_ignore(root, d)]
+            
+            for file in files:
+                if should_ignore(root, file):
+                    continue
+                
+                src_file = os.path.join(root, file)
+                rel_path = os.path.relpath(src_file, src_path)
+                dst_file = os.path.join(dst_path, rel_path)
+                
+                # 确保目标目录存在
+                dst_dir = os.path.dirname(dst_file)
+                if dst_dir:
+                    os.makedirs(dst_dir, exist_ok=True)
+                
+                try:
+                    # 复制文件
+                    shutil.copy2(src_file, dst_file)
+                    logger.debug(f"📄 复制文件: {rel_path}")
+                except Exception as e:
+                    logger.warning(f"⚠️ 跳过文件 {rel_path}: {e}")
     
     async def sync_agent_to_playground(self, agent_id: str) -> bool:
         """将agent的工作同步到playground仓库

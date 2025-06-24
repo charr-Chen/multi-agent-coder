@@ -112,8 +112,20 @@ class CoderAgent:
                 logger.info(f"... (还有 {len(code_lines) - 10} 行)")
             logger.info(f"{'-'*50}")
             
-            # 创建或更新文件
-            file_path = f"src/{issue['id']}.py"
+            # 生成智能文件名
+            try:
+                smart_filename = await self.llm_manager.generate_filename(
+                    issue['title'], 
+                    issue['description'], 
+                    code
+                )
+                file_path = f"src/{smart_filename}.py"
+                logger.info(f"✅ {self.agent_id} 生成智能文件名: {file_path}")
+            except Exception as e:
+                logger.warning(f"⚠️ {self.agent_id} 智能文件名生成失败: {e}")
+                # Fallback: 使用Issue ID
+                file_path = f"src/{issue['id']}.py"
+                logger.info(f"🔄 {self.agent_id} 使用fallback文件名: {file_path}")
             
             # 如果有协作管理器，使用Pull Request流程
             if self.collaboration_manager:

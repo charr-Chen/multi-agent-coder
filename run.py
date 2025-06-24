@@ -217,9 +217,8 @@ async def main():
             print("📚 启动多仓库协作模式...")
             logger.info("使用多仓库模式")
             
-            # 🆕 如果没有指定playground_repo，使用用户仓库
-            if not config["system"]["playground_repo"]:
-                config["system"]["playground_repo"] = user_repo_path
+            # 🆕 playground_repo设为空字符串，创建独立的协作空间
+            config["system"]["playground_repo"] = ""  # 不使用用户仓库作为playground
             
             # 初始化多仓库管理器
             multi_repo_manager = MultiRepoManager(

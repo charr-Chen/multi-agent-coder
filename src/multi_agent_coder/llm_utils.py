@@ -292,4 +292,148 @@ if __name__ == "__main__":
     main()
 '''
             logger.warning(f"🔄 返回基础代码框架，用户需要手动实现")
-            return error_code 
+            return error_code
+
+
+    async def generate_filename(self, issue_title: str, issue_description: str, code: str) -> str:
+        """根据Issue信息和代码内容生成有意义的文件名
+        
+        Args:
+            issue_title: Issue标题
+            issue_description: Issue描述  
+            code: 生成的代码内容
+            
+        Returns:
+            生成的文件名（不含扩展名）
+        """
+        try:
+            logger.info(f"🏷️ 为Issue生成智能文件名: {issue_title}")
+            
+            response = await self.client.chat.completions.create(
+                model="gpt-3.5-turbo",  # 使用便宜的模型
+                messages=[
+                    {
+                        "role": "system", 
+                        "content": """你是一个文件命名专家。根据Issue信息和代码内容，生成一个有意义的英文文件名。
+
+要求：
+1. 使用snake_case格式（如: user_manager, data_processor）
+2. 文件名应该简洁但描述性强
+3. 只返回文件名，不包含扩展名
+4. 长度控制在3-4个单词以内
+5. 避免使用缩写，使用完整单词
+
+示例：
+- 用户管理功能 -> user_manager
+- 数据处理器 -> data_processor  
+- 文件上传工具 -> file_uploader
+- 按钮状态管理 -> button_state_manager"""
+                    },
+                    {
+                        "role": "user", 
+                        "content": f"""根据以下信息生成文件名：
+
+Issue标题: {issue_title}
+Issue描述: {issue_description}
+代码内容预览: {code[:500]}...
+
+请只返回文件名，不要其他内容。"""
+                    }
+                ],
+                temperature=0.3,
+                max_tokens=50
+            )
+            
+            filename = response.choices[0].message.content.strip()
+            
+            # 清理文件名，确保符合规范
+            import re
+            filename = re.sub(r'[^a-zA-Z0-9_]', '_', filename)
+            filename = re.sub(r'_+', '_', filename)
+            filename = filename.strip('_').lower()
+            
+            if filename and len(filename) > 3:
+                logger.info(f"✅ 生成智能文件名: {filename}")
+                return filename
+            else:
+                raise ValueError("生成的文件名无效")
+                
+        except Exception as e:
+            logger.warning(f"⚠️ GPT文件名生成失败: {e}")
+            
+            # Fallback 1: 使用中英文映射
+            try:
+                filename = self._translate_title_to_filename(issue_title)
+                if filename:
+                    logger.info(f"✅ 使用翻译文件名: {filename}")
+                    return filename
+            except Exception as e2:
+                logger.warning(f"⚠️ 翻译文件名失败: {e2}")
+            
+            # Fallback 2: 使用Issue标题的安全版本
+            import re
+            fallback_name = re.sub(r'[^a-zA-Z0-9_]', '_', issue_title[:20].lower())
+            fallback_name = re.sub(r'_+', '_', fallback_name)
+            fallback_name = fallback_name.strip('_')
+            if not fallback_name:
+                fallback_name = "generated_module"
+            logger.info(f"⚠️ 使用fallback文件名: {fallback_name}")
+            return fallback_name
+    
+    def _translate_title_to_filename(self, title: str) -> str:
+        """将中文标题翻译为英文文件名"""
+        # 简单的中英文映射
+        translations = {
+            '用户': 'user',
+            '管理': 'manager',
+            '文件': 'file',
+            '上传': 'uploader', 
+            '下载': 'downloader',
+            '处理': 'processor',
+            '工具': 'tool',
+            '服务': 'service',
+            '接口': 'api',
+            '数据': 'data',
+            '按钮': 'button',
+            '状态': 'state',
+            '终止': 'terminate',
+            '撤销': 'undo',
+            '回滚': 'rollback',
+            '加密': 'encrypt',
+            '解密': 'decrypt',
+            '分析': 'analyzer',
+            '仪表板': 'dashboard',
+            '服务器': 'server',
+            '客户端': 'client',
+            '登录': 'login',
+            '注册': 'register',
+            '认证': 'auth',
+            '授权': 'authorize',
+            '配置': 'config',
+            '设置': 'settings',
+            '日志': 'logger',
+            '监控': 'monitor',
+            '邮件': 'email',
+            '消息': 'message',
+            '通知': 'notification'
+        }
+        
+        import re
+        # 提取中文关键词
+        words = []
+        for chinese, english in translations.items():
+            if chinese in title:
+                words.append(english)
+        
+        if words:
+            filename = '_'.join(words[:3])  # 最多3个单词
+            return filename
+        
+        # 如果没有找到翻译，使用拼音或英文单词
+        english_words = re.findall(r'[a-zA-Z]+', title)
+        if english_words:
+            filename = '_'.join(english_words[:3]).lower()
+            return filename
+            
+        return None
+

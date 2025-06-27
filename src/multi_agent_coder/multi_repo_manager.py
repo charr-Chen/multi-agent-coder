@@ -4,9 +4,13 @@
 """
 
 import os
-import shutil
+import asyncio
 import logging
-from typing import Dict, List, Optional
+import shutil
+import time
+import traceback
+from pathlib import Path
+from typing import Optional
 from git import Repo, GitCommandError
 from .git_utils import GitManager
 
@@ -25,7 +29,7 @@ class MultiRepoManager:
         self.playground_repo_url = playground_repo_url
         self.agent_repos_dir = agent_repos_dir
         self.playground_path = os.path.join(agent_repos_dir, "playground")
-        self.agent_git_managers: Dict[str, GitManager] = {}
+        self.agent_git_managers: dict[str, GitManager] = {}
         self.playground_git_manager: Optional[GitManager] = None
         
         # 确保目录存在
@@ -116,7 +120,9 @@ class MultiRepoManager:
         Returns:
             agent仓库的GitManager
         """
-        agent_repo_path = os.path.join(self.agent_repos_dir, f"agent_{agent_id}")
+        
+        # 使用绝对路径，避免相对路径问题
+        agent_repo_path = os.path.abspath(os.path.join(self.agent_repos_dir, f"agent_{agent_id}"))
         
         try:
             if os.path.exists(agent_repo_path):
@@ -130,10 +136,14 @@ class MultiRepoManager:
                 repo = Repo.init(agent_repo_path)
                 logger.info(f"初始化agent仓库: {agent_repo_path}")
                 
-                # 从playground仓库复制内容（排除Git元数据）
+                # 从playground仓库复制内容（包括参考项目代码）
                 if self.playground_git_manager and os.path.exists(self.playground_path):
                     await self._copy_repo_content(self.playground_path, agent_repo_path)
-                    logger.info(f"从playground复制内容到agent仓库: {agent_repo_path}")
+                    logger.info(f"从playground复制参考项目内容到agent仓库: {agent_repo_path}")
+                
+                # 创建src目录（如果不存在）
+                src_dir = os.path.join(agent_repo_path, "src")
+                os.makedirs(src_dir, exist_ok=True)
                 
                 # 创建初始README文件
                 readme_path = os.path.join(agent_repo_path, "README.md")
@@ -142,6 +152,8 @@ class MultiRepoManager:
                         f.write(f"# Agent {agent_id} Repository\n\n")
                         f.write(f"This is the working repository for agent {agent_id}.\n")
                         f.write("This repository is automatically managed by the multi-agent coder system.\n")
+                        f.write("\n## Reference Project\n")
+                        f.write("This repository contains the reference project code for learning and inspiration.\n")
             
             # 确保.issues.json文件存在
             issues_file = os.path.join(agent_repo_path, ".issues.json")
@@ -170,7 +182,7 @@ class MultiRepoManager:
         """
         import fnmatch
         
-        # 定义要忽略的文件和目录模式
+        # 定义要忽略的文件和目录模式 - 只忽略必要的系统文件
         ignore_patterns = [
             '.git',
             '.git/*',
@@ -181,15 +193,16 @@ class MultiRepoManager:
             'Thumbs.db',
             '.env',
             '.env.*',
-            # 避免AgentGPT相关文件冲突
-            'db/*',
-            'next/*',
-            'platform/*',
-            'docker-compose.yml',
-            'setup.sh',
-            'setup.bat',
-            '.editorconfig',
-            '.gitattributes'
+            # 🆕 避免循环复制agent_repos目录
+            'agent_repos',
+            'agent_repos/*',
+            # 只忽略可能导致冲突的特定文件
+            'node_modules',  # npm依赖
+            '.pytest_cache',  # pytest缓存
+            '*.log',  # 日志文件
+            '.coverage',  # 覆盖率文件
+            '.venv',  # 虚拟环境
+            'venv',   # 虚拟环境
         ]
         
         def should_ignore(path, name):
@@ -203,13 +216,23 @@ class MultiRepoManager:
                     return True
             return False
         
+        logger.info(f"📁 开始复制参考项目内容: {src_path} -> {dst_path}")
+        copied_files = 0
+        
         # 递归复制文件，但排除指定的模式
         for root, dirs, files in os.walk(src_path):
             # 过滤要忽略的目录
+            original_dirs = dirs[:]
             dirs[:] = [d for d in dirs if not should_ignore(root, d)]
+            
+            # 记录被忽略的目录
+            ignored_dirs = set(original_dirs) - set(dirs)
+            if ignored_dirs:
+                logger.debug(f"🚫 忽略目录: {ignored_dirs}")
             
             for file in files:
                 if should_ignore(root, file):
+                    logger.debug(f"🚫 忽略文件: {file}")
                     continue
                 
                 src_file = os.path.join(root, file)
@@ -224,9 +247,12 @@ class MultiRepoManager:
                 try:
                     # 复制文件
                     shutil.copy2(src_file, dst_file)
+                    copied_files += 1
                     logger.debug(f"📄 复制文件: {rel_path}")
                 except Exception as e:
                     logger.warning(f"⚠️ 跳过文件 {rel_path}: {e}")
+        
+        logger.info(f"✅ 完成复制，共复制了 {copied_files} 个文件")
     
     async def sync_agent_to_playground(self, agent_id: str) -> bool:
         """将agent的工作同步到playground仓库
@@ -238,15 +264,20 @@ class MultiRepoManager:
             是否同步成功
         """
         try:
-            if agent_id not in self.agent_git_managers:
-                logger.error(f"Agent {agent_id} 仓库不存在")
-                return False
-            
             if not self.playground_git_manager:
                 logger.error("Playground仓库未初始化")
                 return False
+
+            # 使用绝对路径，避免相对路径问题
+            agent_repo_path = os.path.abspath(os.path.join(self.agent_repos_dir, f"agent_{agent_id}"))
             
-            agent_repo_path = os.path.join(self.agent_repos_dir, f"agent_{agent_id}")
+            # 检查agent仓库是否存在
+            if not os.path.exists(agent_repo_path):
+                logger.error(f"Agent仓库不存在: {agent_repo_path}")
+                return False
+            
+            logger.info(f"🔄 开始同步 {agent_id} 的工作到playground...")
+            synced_files = 0
             
             # 复制agent的工作到playground
             # 这里可以实现更智能的合并策略
@@ -264,28 +295,45 @@ class MultiRepoManager:
                     dst_file = os.path.join(self.playground_path, rel_path)
                     
                     # 确保目标目录存在
-                    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                    dst_dir = os.path.dirname(dst_file)
+                    if dst_dir:
+                        os.makedirs(dst_dir, exist_ok=True)
                     
-                    # 复制文件
-                    shutil.copy2(src_file, dst_file)
+                    try:
+                        # 复制文件
+                        shutil.copy2(src_file, dst_file)
+                        synced_files += 1
+                        logger.debug(f"📄 同步文件: {rel_path}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ 跳过文件 {rel_path}: {e}")
+            
+            logger.info(f"📦 同步了 {synced_files} 个文件")
             
             # 提交到playground仓库
-            await self.playground_git_manager.commit_changes(
+            commit_hash = await self.playground_git_manager.commit_changes(
                 f"同步来自 {agent_id} 的工作",
                 ["."]
             )
             
+            if commit_hash:
+                logger.info(f"✅ 同步提交成功: {commit_hash[:8]}")
+            else:
+                logger.info("📝 没有新的更改需要提交")
+            
             # 只有在有远程仓库时才推送
             if self.playground_repo_url and self.playground_repo_url.strip():
                 await self.playground_git_manager.push_changes()
+                logger.info("📤 已推送到远程仓库")
             else:
-                logger.info("本地仓库模式，跳过推送到远程")
+                logger.debug("本地仓库模式，跳过推送到远程")
             
-            logger.info(f"成功同步 {agent_id} 的工作到playground")
+            logger.info(f"✅ 成功同步 {agent_id} 的工作到playground")
             return True
             
         except Exception as e:
-            logger.error(f"同步agent工作到playground失败: {e}")
+            logger.error(f"❌ 同步agent工作到playground失败: {e}")
+            import traceback
+            logger.debug(f"🔍 同步错误详情:\n{traceback.format_exc()}")
             return False
     
     async def sync_playground_to_agents(self) -> bool:
@@ -313,7 +361,6 @@ class MultiRepoManager:
             
             # 同步到所有agent仓库
             for agent_id, git_manager in self.agent_git_managers.items():
-                agent_repo_path = os.path.join(self.agent_repos_dir, f"agent_{agent_id}")
                 
                 # 复制playground的更新到agent仓库
                 # 这里可以实现更智能的合并策略，避免覆盖agent的工作
@@ -376,16 +423,18 @@ class MultiRepoManager:
             是否清理成功
         """
         try:
-            agent_repo_path = os.path.join(self.agent_repos_dir, f"agent_{agent_id}")
+            # 使用绝对路径，避免相对路径问题
+            agent_repo_path = os.path.abspath(os.path.join(self.agent_repos_dir, f"agent_{agent_id}"))
+            
             if os.path.exists(agent_repo_path):
                 shutil.rmtree(agent_repo_path)
                 logger.info(f"清理agent仓库: {agent_repo_path}")
             
+            # 从管理器中移除
             if agent_id in self.agent_git_managers:
                 del self.agent_git_managers[agent_id]
             
             return True
-            
         except Exception as e:
             logger.error(f"清理agent仓库失败: {e}")
-            return False 
+            return False

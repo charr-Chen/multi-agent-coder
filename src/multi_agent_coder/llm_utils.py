@@ -3,8 +3,12 @@
 提供与 OpenAI API 的交互功能。
 """
 
+import os
+import json
 import logging
-from typing import Dict, Any, List
+import asyncio
+import re
+from typing import Any
 from openai import AsyncOpenAI
 import httpx
 from .config import LLM_CONFIG
@@ -39,7 +43,7 @@ class LLMManager:
         self.max_retries = max_retries
         logger.info("初始化 LLM 管理器")
     
-    async def analyze_requirements(self, requirements: str) -> List[Dict[str, str]]:
+    async def analyze_requirements(self, requirements: str) -> list[dict[str, str]]:
         """分析用户需求，生成 Issue 列表
         
         Args:
@@ -144,7 +148,7 @@ class LLMManager:
                 'description': f"用户需求: {requirements}\n\n请根据上述需求实现相应功能。"
             }]
     
-    async def review_code(self, issue: Dict[str, Any], code: str) -> Dict[str, Any]:
+    async def review_code(self, issue: dict[str, Any], code: str) -> dict[str, Any]:
         """审查代码提交
         
         Args:
@@ -189,7 +193,7 @@ Issue: {issue['title']}
             logger.error(f"审查代码时出错: {e}")
             return {"approved": False, "comments": str(e)}
     
-    async def generate_code(self, issue: Dict[str, Any]) -> str:
+    async def generate_code(self, issue: dict[str, Any]) -> str:
         """生成代码实现
         
         Args:
@@ -436,4 +440,72 @@ Issue描述: {issue_description}
             return filename
             
         return None
+    
+    async def generate_response(self, prompt: str) -> str:
+        """生成通用响应
+        
+        Args:
+            prompt: 输入提示
+            
+        Returns:
+            生成的响应
+        """
+        try:
+            response = await self.client.chat.completions.create(
+                model=LLM_CONFIG["model"],
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=LLM_CONFIG["temperature"],
+                max_tokens=LLM_CONFIG["max_tokens"]
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            logger.error(f"生成响应失败: {e}")
+            return f"响应生成失败: {str(e)}"
+    
+    async def generate_code_from_prompt(self, prompt: str) -> str:
+        """根据提示生成代码
+        
+        Args:
+            prompt: 代码生成提示
+            
+        Returns:
+            生成的代码
+        """
+        try:
+            response = await self.client.chat.completions.create(
+                model=LLM_CONFIG["model"],
+                messages=[
+                    {
+                        "role": "system", 
+                        "content": "你是一个专业的Python程序员，根据用户要求生成高质量的Python代码。请只返回代码，不要包含解释或markdown格式。"
+                    },
+                    {
+                        "role": "user", 
+                        "content": prompt
+                    }
+                ],
+                temperature=LLM_CONFIG["temperature"],
+                max_tokens=LLM_CONFIG["max_tokens"]
+            )
+            
+            generated_code = response.choices[0].message.content.strip()
+            
+            # 清理可能的markdown格式
+            if generated_code.startswith("```python"):
+                generated_code = generated_code[9:].strip()
+            elif generated_code.startswith("```"):
+                generated_code = generated_code[3:].strip()
+            
+            if generated_code.endswith("```"):
+                generated_code = generated_code[:-3].strip()
+            
+            return generated_code
+            
+        except Exception as e:
+            logger.error(f"代码生成失败: {e}")
+            return f"# 代码生成失败: {str(e)}\n# 请手动实现相关功能"
 

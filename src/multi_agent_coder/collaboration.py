@@ -12,69 +12,64 @@ import os
 import json
 import logging
 import asyncio
-from typing import Dict, List, Any, Optional
-from datetime import datetime
+import uuid
+from datetime import datetime, timezone
+from dataclasses import dataclass, asdict
+from enum import Enum
+from typing import Any, Optional
 from .git_utils import GitManager
 from .llm_utils import LLMManager
 
 logger = logging.getLogger(__name__)
 
+class PRStatus(Enum):
+    OPEN = "open"
+    MERGED = "merged" 
+    CLOSED = "closed"
+
+@dataclass
 class PullRequest:
     """Pull Request 类"""
     
-    def __init__(self, pr_id: str, issue_id: str, author: str, title: str, 
-                 description: str, code_changes: Dict[str, str], branch_name: str):
-        self.pr_id = pr_id
-        self.issue_id = issue_id
-        self.author = author
-        self.title = title
-        self.description = description
-        self.code_changes = code_changes  # {file_path: code_content}
-        self.branch_name = branch_name
-        self.status = "open"  # open, approved, rejected, merged
-        self.created_at = datetime.now().isoformat()
-        self.reviewed_at = None
-        self.reviewer = None
-        self.review_comments = []
-        self.merge_commit = None
+    id: str
+    title: str
+    description: str
+    author: str
+    created_at: str
+    status: PRStatus
+    source_branch: str
+    target_branch: str
+    code_changes: dict[str, str]  # 文件路径 -> 代码内容
     
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {
-            "pr_id": self.pr_id,
-            "issue_id": self.issue_id,
-            "author": self.author,
-            "title": self.title,
-            "description": self.description,
-            "code_changes": self.code_changes,
-            "branch_name": self.branch_name,
-            "status": self.status,
-            "created_at": self.created_at,
-            "reviewed_at": self.reviewed_at,
-            "reviewer": self.reviewer,
-            "review_comments": self.review_comments,
-            "merge_commit": self.merge_commit
-        }
+    def __post_init__(self):
+        if isinstance(self.status, str):
+            self.status = PRStatus(self.status)
     
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'PullRequest':
-        """从字典创建"""
-        pr = cls(
-            data["pr_id"],
-            data["issue_id"],
-            data["author"],
-            data["title"],
-            data["description"],
-            data["code_changes"],
-            data["branch_name"]
+    def create(cls, title: str, author: str, source_branch: str,
+              description: str, code_changes: dict[str, str], branch_name: str):
+        return cls(
+            id=str(uuid.uuid4()),
+            title=title,
+            description=description,
+            author=author,
+            created_at=datetime.now(timezone.utc).isoformat(),
+            status=PRStatus.OPEN,
+            source_branch=source_branch,
+            target_branch="main",
+            code_changes=code_changes
         )
-        pr.status = data.get("status", "open")
-        pr.created_at = data.get("created_at", datetime.now().isoformat())
-        pr.reviewed_at = data.get("reviewed_at")
-        pr.reviewer = data.get("reviewer")
-        pr.review_comments = data.get("review_comments", [])
-        pr.merge_commit = data.get("merge_commit")
-        return pr
+    
+    def to_dict(self) -> dict[str, Any]:
+        """转换为字典格式"""
+        data = asdict(self)
+        data['status'] = self.status.value
+        return data
+    
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> 'PullRequest':
+        """从字典创建实例"""
+        return cls(**data)
 
 class CollaborationManager:
     """协作管理器"""
@@ -89,7 +84,7 @@ class CollaborationManager:
         self.main_repo_git_manager = main_repo_git_manager
         self.llm_manager = llm_manager
         self.pr_file_path = os.path.join(main_repo_git_manager.repo_path, ".pull_requests.json")
-        self.agent_repos: Dict[str, GitManager] = {}
+        self.agent_repos: dict[str, GitManager] = {}
         
         # 确保PR文件存在
         self._ensure_pr_file()
@@ -112,33 +107,27 @@ class CollaborationManager:
         self.agent_repos[agent_id] = git_manager
         logger.info(f"注册agent仓库: {agent_id}")
     
-    async def create_pull_request(self, issue_id: str, author: str, title: str, 
-                                description: str, code_changes: Dict[str, str]) -> str:
+    async def create_pull_request(self, title: str, author: str, source_branch: str,
+                                description: str, code_changes: dict[str, str]) -> str:
         """创建Pull Request
         
         Args:
-            issue_id: 关联的Issue ID
-            author: 作者（agent ID）
             title: PR标题
+            author: 作者（agent ID）
+            source_branch: 源分支
             description: PR描述
             code_changes: 代码更改 {file_path: code_content}
             
         Returns:
             PR ID
         """
-        # 生成PR ID
-        pr_id = f"pr_{issue_id}_{author}_{int(datetime.now().timestamp())}"
-        branch_name = f"feature/{issue_id}-{author}"
-        
-        # 创建PR对象
-        pr = PullRequest(
-            pr_id=pr_id,
-            issue_id=issue_id,
-            author=author,
+        pr = PullRequest.create(
             title=title,
+            author=author,
+            source_branch=source_branch,
             description=description,
             code_changes=code_changes,
-            branch_name=branch_name
+            branch_name=source_branch
         )
         
         # 在author的仓库中创建分支
@@ -146,8 +135,8 @@ class CollaborationManager:
             agent_git = self.agent_repos[author]
             try:
                 # 创建并切换到新分支
-                await agent_git.create_branch(branch_name)
-                logger.info(f"为{author}创建分支: {branch_name}")
+                await agent_git.create_branch(source_branch)
+                logger.info(f"为{author}创建分支: {source_branch}")
                 
                 # 在分支中提交代码更改
                 for file_path, code_content in code_changes.items():
@@ -158,9 +147,9 @@ class CollaborationManager:
                         f.write(code_content)
                 
                 # 提交更改
-                commit_message = f"feat: {title}\n\nImplements #{issue_id}\n\nPR: #{pr_id}"
+                commit_message = f"feat: {title}\n\nImplements #{pr.id}\n\nPR: #{pr.id}"
                 await agent_git.commit_changes(commit_message, list(code_changes.keys()))
-                logger.info(f"{author}在分支{branch_name}中提交代码")
+                logger.info(f"{author}在分支{source_branch}中提交代码")
                 
             except Exception as e:
                 logger.error(f"在agent仓库中创建分支失败: {e}")
@@ -168,12 +157,12 @@ class CollaborationManager:
         # 保存PR到文件
         await self._save_pull_request(pr)
         
-        logger.info(f"🔄 创建Pull Request: {pr_id} by {author}")
+        logger.info(f"✨ 创建Pull Request: {title} (作者: {author})")
         logger.info(f"📋 PR标题: {title}")
-        logger.info(f"🌿 分支: {branch_name}")
+        logger.info(f"🌿 分支: {source_branch}")
         logger.info(f"📁 文件数量: {len(code_changes)}")
         
-        return pr_id
+        return pr.id
     
     async def _save_pull_request(self, pr: PullRequest):
         """保存PR到文件"""
@@ -186,7 +175,7 @@ class CollaborationManager:
             prs = data.get("pull_requests", [])
             existing_pr_index = None
             for i, existing_pr in enumerate(prs):
-                if existing_pr["pr_id"] == pr.pr_id:
+                if existing_pr["id"] == pr.id:
                     existing_pr_index = i
                     break
             
@@ -203,14 +192,14 @@ class CollaborationManager:
             
             # 提交PR文件更改到主仓库
             await self.main_repo_git_manager.commit_changes(
-                f"Update PR: {pr.pr_id}",
+                f"Update PR: {pr.id}",
                 [".pull_requests.json"]
             )
             
         except Exception as e:
             logger.error(f"保存PR失败: {e}")
     
-    async def get_open_pull_requests(self) -> List[PullRequest]:
+    async def get_open_pull_requests(self) -> list[PullRequest]:
         """获取开放的Pull Request"""
         try:
             with open(self.pr_file_path, "r", encoding="utf-8") as f:
@@ -218,7 +207,7 @@ class CollaborationManager:
             
             prs = []
             for pr_data in data.get("pull_requests", []):
-                if pr_data.get("status") == "open":
+                if pr_data.get("status") == PRStatus.OPEN:
                     prs.append(PullRequest.from_dict(pr_data))
             
             return prs
@@ -250,7 +239,7 @@ class CollaborationManager:
             pr_index = None
             
             for i, pr in enumerate(prs):
-                if pr["pr_id"] == pr_id:
+                if pr["id"] == pr_id:
                     pr_data = pr
                     pr_index = i
                     break
@@ -260,14 +249,14 @@ class CollaborationManager:
                 return False
             
             # 更新PR状态
-            pr_data["status"] = "approved" if approved else "rejected"
-            pr_data["reviewed_at"] = datetime.now().isoformat()
+            pr_data["status"] = PRStatus.CLOSED if approved else PRStatus.OPEN
+            pr_data["reviewed_at"] = datetime.now(timezone.utc).isoformat()
             pr_data["reviewer"] = reviewer
             pr_data["review_comments"].append({
                 "reviewer": reviewer,
                 "approved": approved,
                 "comments": comments,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             })
             
             prs[pr_index] = pr_data
@@ -317,12 +306,12 @@ class CollaborationManager:
             pr_index = None
             
             for i, pr in enumerate(data.get("pull_requests", [])):
-                if pr["pr_id"] == pr_id:
+                if pr["id"] == pr_id:
                     pr_data = pr
                     pr_index = i
                     break
             
-            if not pr_data or pr_data["status"] != "approved":
+            if not pr_data or pr_data["status"] != PRStatus.CLOSED:
                 logger.error(f"PR {pr_id} 未找到或未通过审核")
                 return False
             
@@ -339,14 +328,14 @@ class CollaborationManager:
                 logger.info(f"📁 合并文件: {file_path}")
             
             # 提交合并
-            merge_message = f"Merge PR #{pr_id}: {pr_data['title']}\n\nCloses #{pr_data['issue_id']}"
+            merge_message = f"Merge PR #{pr_id}: {pr_data['title']}\n\nCloses #{pr_data['id']}"
             commit_hash = await self.main_repo_git_manager.commit_changes(
                 merge_message,
                 list(pr_data["code_changes"].keys())
             )
             
             # 更新PR状态
-            pr_data["status"] = "merged"
+            pr_data["status"] = PRStatus.MERGED
             pr_data["merge_commit"] = commit_hash
             data["pull_requests"][pr_index] = pr_data
             
@@ -373,7 +362,7 @@ class CollaborationManager:
     
     async def sync_all_agents(self):
         """同步所有agent的代码"""
-        logger.info("🔄 开始同步所有agent的代码...")
+        logger.info("�� 开始同步所有agent的代码...")
         
         for agent_id, agent_git in self.agent_repos.items():
             try:
@@ -488,7 +477,7 @@ class CollaborationManager:
                 data = json.load(f)
             
             for pr_data in data.get("pull_requests", []):
-                if pr_data["pr_id"] == pr_id:
+                if pr_data["id"] == pr_id:
                     return PullRequest.from_dict(pr_data)
             
             return None
@@ -505,9 +494,9 @@ class CollaborationManager:
                 data = json.load(f)
             
             for pr_data in data.get("pull_requests", []):
-                if pr_data["status"] == "merged":
+                if pr_data["status"] == PRStatus.MERGED:
                     author = pr_data["author"]
-                    branch_name = pr_data["branch_name"]
+                    branch_name = pr_data["source_branch"]
                     
                     if author in self.agent_repos:
                         try:
@@ -518,4 +507,212 @@ class CollaborationManager:
                             logger.debug(f"删除分支失败: {e}")
             
         except Exception as e:
-            logger.error(f"清理分支失败: {e}") 
+            logger.error(f"清理分支失败: {e}")
+    
+    async def sync_agent_to_playground(self, agent_id: str) -> bool:
+        """同步Agent工作到playground
+        
+        Args:
+            agent_id: Agent ID
+            
+        Returns:
+            是否同步成功
+        """
+        try:
+            logger.info(f"🔄 开始同步 {agent_id} 的工作到playground")
+            
+            if agent_id not in self.agent_repos:
+                logger.warning(f"⚠️ Agent {agent_id} 未注册")
+                return False
+            
+            agent_git = self.agent_repos[agent_id]
+            
+            # 获取agent最近的提交
+            try:
+                # 检查是否有提交
+                recent_commits = await self._get_recent_commits(agent_git, limit=5)
+                if not recent_commits:
+                    logger.info(f"📭 {agent_id} 没有新的提交需要同步")
+                    return True
+                
+                # 同步修改的文件到playground
+                synced_files = await self._sync_agent_changes_to_playground(agent_git, agent_id)
+                
+                if synced_files:
+                    # 在playground仓库中提交同步的更改
+                    commit_message = f"Sync changes from {agent_id}\n\n同步来自 {agent_id} 的代码更改"
+                    commit_hash = await self.main_repo_git_manager.commit_changes(
+                        commit_message,
+                        synced_files
+                    )
+                    
+                    if commit_hash:
+                        logger.info(f"✅ 成功同步 {agent_id} 的 {len(synced_files)} 个文件到playground")
+                        logger.info(f"📝 同步提交: {commit_hash[:8]}")
+                        
+                        # 通知其他agent同步更新
+                        await self._notify_other_agents_sync(agent_id)
+                        return True
+                    else:
+                        logger.warning(f"⚠️ 同步提交失败")
+                        return False
+                else:
+                    logger.info(f"📭 {agent_id} 没有文件更改需要同步")
+                    return True
+                    
+            except Exception as e:
+                logger.error(f"❌ 获取 {agent_id} 提交信息失败: {e}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ 同步 {agent_id} 失败: {e}")
+            return False
+    
+    async def _get_recent_commits(self, git_manager: GitManager, limit: int = 5) -> list[str]:
+        """获取最近的提交列表"""
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["git", "log", "--oneline", f"-{limit}"],
+                cwd=git_manager.repo_path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            if result.stdout.strip():
+                return result.stdout.strip().split('\n')
+            return []
+        except subprocess.CalledProcessError:
+            return []
+    
+    async def _sync_agent_changes_to_playground(self, agent_git: GitManager, agent_id: str) -> list[str]:
+        """将agent的更改同步到playground"""
+        try:
+            import shutil
+            import fnmatch
+            
+            synced_files = []
+            
+            # 获取agent仓库中的所有文件
+            for root, dirs, files in os.walk(agent_git.repo_path):
+                # 跳过.git目录
+                dirs[:] = [d for d in dirs if d != '.git']
+                
+                for file in files:
+                    src_file = os.path.join(root, file)
+                    
+                    # 跳过特殊文件
+                    if any(pattern in src_file for pattern in ['.git', '__pycache__', '.pyc', '.DS_Store']):
+                        continue
+                    
+                    # 计算相对路径
+                    rel_path = os.path.relpath(src_file, agent_git.repo_path)
+                    
+                    # 跳过系统文件
+                    if rel_path.startswith('.'):
+                        continue
+                    
+                    dst_file = os.path.join(self.main_repo_git_manager.repo_path, rel_path)
+                    
+                    # 检查文件是否有更改
+                    if os.path.exists(dst_file):
+                        # 比较文件内容
+                        try:
+                            with open(src_file, 'r', encoding='utf-8') as f1, \
+                                 open(dst_file, 'r', encoding='utf-8') as f2:
+                                if f1.read() == f2.read():
+                                    continue  # 文件内容相同，跳过
+                        except (UnicodeDecodeError, IOError):
+                            # 二进制文件或读取失败，使用文件大小和修改时间比较
+                            src_stat = os.stat(src_file)
+                            dst_stat = os.stat(dst_file)
+                            if src_stat.st_size == dst_stat.st_size and src_stat.st_mtime <= dst_stat.st_mtime:
+                                continue
+                    
+                    # 确保目标目录存在
+                    dst_dir = os.path.dirname(dst_file)
+                    if dst_dir:
+                        os.makedirs(dst_dir, exist_ok=True)
+                    
+                    # 复制文件
+                    try:
+                        shutil.copy2(src_file, dst_file)
+                        synced_files.append(rel_path)
+                        logger.debug(f"📄 同步文件: {rel_path}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ 复制文件失败 {rel_path}: {e}")
+            
+            logger.info(f"📦 {agent_id} 同步了 {len(synced_files)} 个文件")
+            return synced_files
+            
+        except Exception as e:
+            logger.error(f"❌ 同步agent更改失败: {e}")
+            return []
+    
+    async def _notify_other_agents_sync(self, source_agent_id: str):
+        """通知其他agent同步更新"""
+        try:
+            logger.info(f"📢 通知其他agent同步来自 {source_agent_id} 的更新")
+            
+            for agent_id, agent_git in self.agent_repos.items():
+                if agent_id != source_agent_id:
+                    try:
+                        # 从playground同步到其他agent
+                        await self._sync_playground_to_agent(agent_git, agent_id)
+                        logger.debug(f"✅ 通知 {agent_id} 同步完成")
+                    except Exception as e:
+                        logger.warning(f"⚠️ 通知 {agent_id} 同步失败: {e}")
+                        
+        except Exception as e:
+            logger.error(f"❌ 通知其他agent同步失败: {e}")
+    
+    async def _sync_playground_to_agent(self, agent_git: GitManager, agent_id: str):
+        """从playground同步到指定agent"""
+        try:
+            import shutil
+            
+            synced_files = []
+            
+            # 从playground复制更新的文件到agent仓库
+            for root, dirs, files in os.walk(self.main_repo_git_manager.repo_path):
+                # 跳过.git目录
+                dirs[:] = [d for d in dirs if d != '.git']
+                
+                for file in files:
+                    src_file = os.path.join(root, file)
+                    
+                    # 跳过特殊文件
+                    if any(pattern in src_file for pattern in ['.git', '__pycache__', '.pyc', '.DS_Store']):
+                        continue
+                    
+                    # 计算相对路径
+                    rel_path = os.path.relpath(src_file, self.main_repo_git_manager.repo_path)
+                    
+                    # 跳过系统文件
+                    if rel_path.startswith('.'):
+                        continue
+                    
+                    dst_file = os.path.join(agent_git.repo_path, rel_path)
+                    
+                    # 确保目标目录存在
+                    dst_dir = os.path.dirname(dst_file)
+                    if dst_dir:
+                        os.makedirs(dst_dir, exist_ok=True)
+                    
+                    # 复制文件（如果源文件更新）
+                    try:
+                        if not os.path.exists(dst_file) or os.path.getmtime(src_file) > os.path.getmtime(dst_file):
+                            shutil.copy2(src_file, dst_file)
+                            synced_files.append(rel_path)
+                    except Exception as e:
+                        logger.debug(f"复制文件失败 {rel_path}: {e}")
+            
+            if synced_files:
+                # 在agent仓库中提交同步的更改
+                commit_message = f"Sync updates from playground\n\n从playground同步更新"
+                await agent_git.commit_changes(commit_message, synced_files)
+                logger.debug(f"📦 {agent_id} 从playground同步了 {len(synced_files)} 个文件")
+            
+        except Exception as e:
+            logger.error(f"❌ 从playground同步到 {agent_id} 失败: {e}") 

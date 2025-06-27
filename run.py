@@ -4,8 +4,15 @@
 """
 
 import os
-import logging
+import logging.handlers
 import asyncio
+import queue
+import threading
+
+import coloredlogs
+
+coloredlogs.install()
+
 from src.multi_agent_coder.git_utils import GitManager
 from src.multi_agent_coder.multi_repo_manager import MultiRepoManager
 from src.multi_agent_coder.llm_utils import LLMManager
@@ -13,11 +20,38 @@ from src.multi_agent_coder.agents import CommenterAgent, CoderAgent
 from src.multi_agent_coder.collaboration import CollaborationManager
 from src.multi_agent_coder.config import get_config
 
-# 配置日志
+# 创建日志队列和处理器
+log_queue = queue.Queue()
+queue_handler = logging.handlers.QueueHandler(log_queue)
+
+# 创建文件和控制台处理器
+file_handler = logging.FileHandler('multi_agent_coder.log', encoding='utf-8')
+console_handler = logging.StreamHandler()
+
+# 设置格式
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+console_handler.setFormatter(formatter)
+
+# 创建监听器
+listener = logging.handlers.QueueListener(log_queue, file_handler, console_handler)
+
+# 配置根日志器
 logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO,
+    handlers=[queue_handler]
 )
+
+# 启动监听器
+listener.start()
+
+# 设置特定模块的日志级别，减少噪音
+logging.getLogger('multi_agent_coder.agents.thinking').setLevel(logging.WARNING)
+logging.getLogger('multi_agent_coder.agents.tools').setLevel(logging.WARNING)
+logging.getLogger('openai').setLevel(logging.WARNING)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 def get_user_repo():
@@ -229,6 +263,113 @@ async def main():
             # 设置playground仓库
             playground_git_manager = await multi_repo_manager.setup_playground_repo()
             
+            # 🆕 关键步骤：复制用户项目内容到playground仓库，让agent能学习参考代码
+            logger.info("📁 复制用户项目内容到playground仓库...")
+            try:
+                # 复制用户项目的所有内容到playground（除了.git目录）
+                import shutil
+                import fnmatch
+                
+                # 🆕 智能项目检测：如果用户选择的是当前目录（我们的多智能体系统），
+                # 优先查找AgentGPT目录作为参考项目
+                current_dir = os.path.abspath(os.getcwd())
+                user_dir = os.path.abspath(user_repo_path)
+                
+                if user_dir == current_dir:
+                    logger.info("检测到用户选择当前目录")
+                    # 检查是否有AgentGPT目录
+                    agentgpt_path = os.path.join(user_repo_path, "AgentGPT")
+                    if os.path.exists(agentgpt_path):
+                        logger.info("找到AgentGPT项目，将其作为参考项目")
+                        source_path = agentgpt_path
+                        project_name = "AgentGPT"
+                    else:
+                        logger.warning("⚠️ 在当前目录未找到AgentGPT项目")
+                        logger.info("将复制当前目录的内容（排除系统文件）")
+                        source_path = user_repo_path
+                        project_name = "当前项目"
+                else:
+                    logger.info(f"复制用户指定的项目: {user_repo_path}")
+                    source_path = user_repo_path
+                    project_name = os.path.basename(user_repo_path)
+                
+                # 通用的文件过滤函数
+                def should_copy_file(root, name, source_root):
+                    """判断是否应该复制文件"""
+                    # 基本的忽略模式
+                    ignore_patterns = [
+                        '.git', '.git/*',
+                        '__pycache__', '*.pyc', '*.pyo',
+                        '.DS_Store', 'Thumbs.db',
+                        'node_modules',
+                        '.pytest_cache',
+                        '*.log',
+                        '.coverage',
+                        '.venv', 'venv',
+                        '.env', '.env.*'
+                    ]
+                    
+                    # 如果源路径是当前目录，额外排除我们系统的文件
+                    if os.path.abspath(source_root) == current_dir:
+                        ignore_patterns.extend([
+                            'agent_repos', 'agent_repos/*',
+                            'src/multi_agent_coder*', 
+                            'test_*.py',
+                            'pyproject.toml',
+                            'uv.lock',
+                            'requirements.txt',
+                            '*.egg-info', '*.egg-info/*',
+                            'run.py',
+                            'test_startup.py'
+                        ])
+                    
+                    # 检查是否匹配忽略模式
+                    for pattern in ignore_patterns:
+                        if fnmatch.fnmatch(name, pattern):
+                            return False
+                    
+                    return True
+                
+                # 执行复制
+                copied_files = 0
+                playground_path = playground_git_manager.repo_path
+                
+                for root, dirs, files in os.walk(source_path):
+                    # 过滤目录
+                    dirs[:] = [d for d in dirs if should_copy_file(root, d, source_path)]
+                    
+                    for file in files:
+                        if not should_copy_file(root, file, source_path):
+                            continue
+                        
+                        src_file = os.path.join(root, file)
+                        rel_path = os.path.relpath(src_file, source_path)
+                        dst_file = os.path.join(playground_path, rel_path)
+                        
+                        # 确保目标目录存在
+                        dst_dir = os.path.dirname(dst_file)
+                        if dst_dir:
+                            os.makedirs(dst_dir, exist_ok=True)
+                        
+                        try:
+                            shutil.copy2(src_file, dst_file)
+                            copied_files += 1
+                        except Exception as e:
+                            logger.warning(f"⚠️ 复制文件失败 {rel_path}: {e}")
+                
+                logger.info(f"✅ 成功复制 {copied_files} 个{project_name}文件到playground仓库")
+                
+                # 提交复制的内容
+                if copied_files > 0:
+                    await playground_git_manager.commit_changes(
+                        f"复制{project_name}内容作为参考代码",
+                        ["."]
+                    )
+                
+            except Exception as e:
+                logger.error(f"❌ 复制用户项目内容失败: {e}")
+                logger.warning("⚠️ Agent将在没有参考代码的情况下工作")
+            
             # 🆕 关键步骤：同步主项目的Issues到playground仓库
             logger.info("🔄 同步主项目Issues到playground仓库...")
             try:
@@ -261,7 +402,7 @@ async def main():
             logger.info("✅ 创建协作管理器")
             
             # 创建评论员代理（使用playground仓库）
-            commenter = CommenterAgent(playground_git_manager, llm_manager)
+            commenter = CommenterAgent("commenter", playground_git_manager, llm_manager)
             commenter.set_collaboration_manager(collaboration_manager)
             
             # 创建编码员代理（每个使用独立仓库）
@@ -296,7 +437,7 @@ async def main():
             git_manager = GitManager(repo_path)
             
             # 创建评论员代理
-            commenter = CommenterAgent(git_manager, llm_manager)
+            commenter = CommenterAgent("commenter", git_manager, llm_manager)
             
             # 创建编码员代理
             coders = [
@@ -306,16 +447,21 @@ async def main():
         
         # 启动所有代理
         print("\n" + "=" * 60)
-        print("🚀 启动多智能体协作系统...")
+        print("🚀 正在启动多智能体协作系统...")
         print(f"📊 系统配置: 1个Commenter + {len(coders)}个Coder")
         print(f"📁 工作仓库: {user_repo_path}")
-        print("💬 请向Commenter描述你的需求，开始协作编程！")
+        print("⏳ 请稍等，系统正在初始化...")
         print("=" * 60)
         print()
         
+        # 设置日志级别，减少启动时的噪音
+        logging.getLogger('src.multi_agent_coder.agents.coder').setLevel(logging.WARNING)
+        logging.getLogger('src.multi_agent_coder.git_utils').setLevel(logging.WARNING)
+        logging.getLogger('src.multi_agent_coder.multi_repo_manager').setLevel(logging.WARNING)
+        
         tasks = [
-            commenter.run(),
-            *[coder.run() for coder in coders]
+            asyncio.create_task(commenter.run()),
+            *[asyncio.create_task(coder.run()) for coder in coders]
         ]
         
         # 等待所有任务完成
@@ -325,6 +471,13 @@ async def main():
         logger.error(f"运行出错: {e}")
         import traceback
         logger.error(f"🔍 错误详情:\n{traceback.format_exc()}")
+    finally:
+        # 清理日志监听器
+        listener.stop()
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    try:
+        asyncio.run(main())
+    finally:
+        # 确保日志监听器被正确关闭
+        listener.stop() 

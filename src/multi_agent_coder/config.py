@@ -5,7 +5,7 @@
 
 import os
 import logging
-from typing import Dict, Any
+from typing import Any
 from dotenv import load_dotenv
 
 # 配置日志
@@ -66,7 +66,7 @@ AGENT_CONFIG = {
     },
 }
 
-def get_config() -> Dict[str, Any]:
+def get_config() -> dict[str, Any]:
     """获取完整配置
     
     Returns:

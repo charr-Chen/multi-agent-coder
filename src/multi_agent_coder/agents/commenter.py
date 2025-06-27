@@ -4,8 +4,11 @@
 """
 
 import logging
+import re
+import time
 import asyncio
-from typing import List, Dict, Any, Optional
+from pathlib import Path
+from typing import Any, Optional
 from ..git_utils import GitManager
 from ..llm_utils import LLMManager
 from ..config import AGENT_CONFIG
@@ -15,18 +18,55 @@ logger = logging.getLogger(__name__)
 class CommenterAgent:
     """评论员代理类"""
     
-    def __init__(self, git_manager: GitManager, llm_manager: LLMManager):
+    def __init__(self, agent_id: str, git_manager: GitManager, llm_manager: LLMManager):
         """初始化评论员代理
         
         Args:
+            agent_id: 代理ID
             git_manager: Git 仓库管理器
             llm_manager: LLM 管理器
         """
+        self.agent_id = agent_id
         self.git_manager = git_manager
         self.llm_manager = llm_manager
         self.config = AGENT_CONFIG["commenter"]
         self.collaboration_manager = None  # 协作管理器
-        logger.info("初始化评论员代理")
+        
+        # 注释模板和规范
+        self.comment_templates = {
+            "function": '''"""
+{description}
+
+Args:
+{args}
+
+Returns:
+{returns}
+
+Raises:
+{raises}
+"""''',
+            "class": '''"""
+{description}
+
+Attributes:
+{attributes}
+
+Example:
+{example}
+"""''',
+            "module": '''"""
+{description}
+
+This module contains:
+{contents}
+
+Author: {author}
+Created: {created}
+"""'''
+        }
+        
+        logger.info(f"📝 注释员代理 {agent_id} 初始化完成")
     
     def set_collaboration_manager(self, collaboration_manager):
         """设置协作管理器
@@ -37,7 +77,7 @@ class CommenterAgent:
         self.collaboration_manager = collaboration_manager
         logger.info("评论员设置协作管理器")
     
-    async def create_issue(self, title: str, description: str) -> Dict[str, Any]:
+    async def create_issue(self, title: str, description: str) -> dict[str, Any]:
         """创建新的 Issue
         
         Args:
@@ -61,7 +101,7 @@ class CommenterAgent:
         for issue in issues:
             await self.create_issue(issue["title"], issue["description"])
     
-    async def review_code(self, issue_id: str, code_changes: Dict[str, Any]) -> bool:
+    async def review_code(self, issue_id: str, code_changes: dict[str, Any]) -> bool:
         """审查代码提交
         
         Args:
@@ -127,36 +167,79 @@ class CommenterAgent:
         同时提供用户交互界面，让用户可以输入新需求。
         """
         logger.info("🔍 开始监控代码库...")
-        logger.info("💬 欢迎使用多代理编码系统!")
-        logger.info("📝 你可以随时输入需求，我会分析并创建对应的Issues")
-        logger.info("✨ 输入格式：直接描述你想要实现的功能")
-        logger.info("🚪 输入 'quit' 或 'exit' 退出系统")
-        logger.info("=" * 50)
+        
+        # 等待一下让系统完全启动
+        await asyncio.sleep(2)
+        
+        # 显示醒目的用户交互提示
+        print("\n" + "=" * 80)
+        print("🎉 系统已启动完成！")
+        print("💬 欢迎使用多代理编程系统!")
+        print("📝 请描述你想要实现的功能，我会分析并创建对应的Issues")
+        print("✨ 然后CoderAgent们会竞争抢夺这些Issues并实现代码")
+        print("🚪 输入 'quit' 或 'exit' 退出系统")
+        print("=" * 80)
+        print()
         
         # 创建异步任务处理用户输入
         async def handle_user_input():
             """处理用户输入的异步任务"""
-            import aioconsole
+            import sys
+            import asyncio
+            from concurrent.futures import ThreadPoolExecutor
+            
+            def get_user_input_sync(prompt):
+                """同步获取用户输入"""
+                try:
+                    return input(prompt)
+                except (EOFError, KeyboardInterrupt):
+                    return "quit"
+            
+            # 使用线程池执行器来处理同步输入
+            executor = ThreadPoolExecutor(max_workers=1)
+            
             while True:
                 try:
-                    logger.info("💭 请输入你的需求 (输入 'quit' 退出):")
-                    user_input = await aioconsole.ainput("👤 需求: ")
+                    # 使用更醒目的提示
+                    print("\n" + "🔥" * 50)
+                    print("💭 请输入你的需求描述:")
+                    print("   例如: '添加用户登录功能'")
+                    print("   例如: '实现文件上传接口'")
+                    print("   例如: '创建数据库连接模块'")
+                    print("🔥" * 50)
+                    
+                    # 在单独的线程中获取用户输入，避免阻塞异步事件循环
+                    loop = asyncio.get_event_loop()
+                    user_input = await loop.run_in_executor(
+                        executor, 
+                        get_user_input_sync, 
+                        "👤 你的需求: "
+                    )
                     
                     if user_input.lower().strip() in ['quit', 'exit', 'q']:
-                        logger.info("👋 感谢使用，再见!")
+                        print("\n🎉 感谢使用多代理编程系统！")
+                        print("👋 再见!")
+                        executor.shutdown(wait=False)
                         return
                     
                     if user_input.strip():
-                        logger.info(f"🎯 收到用户需求: {user_input}")
+                        print(f"\n🎯 收到用户需求: {user_input}")
+                        print("🤖 正在分析需求并创建Issues...")
                         await self.analyze_requirements(user_input)
+                        print("✅ 需求分析完成，已创建对应的Issues")
+                        print("🔄 CoderAgent们将开始抢夺和实现这些Issues...")
+                        print("⏳ 请稍等，查看实现进度...")
                     else:
-                        logger.info("⚠️ 请输入有效的需求描述")
+                        print("⚠️ 请输入有效的需求描述")
                         
                 except KeyboardInterrupt:
-                    logger.info("👋 接收到中断信号，退出...")
+                    print("\n👋 接收到中断信号，退出...")
+                    executor.shutdown(wait=False)
                     return
                 except Exception as e:
                     logger.error(f"❌ 处理用户输入时出错: {e}")
+                    # 等待一段时间避免无限循环
+                    await asyncio.sleep(1)
         
         # 创建监控任务
         async def repo_monitoring():

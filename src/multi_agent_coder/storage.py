@@ -4,7 +4,7 @@
 import json
 import logging
 import asyncio
-from typing import Optional, List, Tuple
+from typing import Optional
 from datetime import datetime
 import os
 import aiofiles
@@ -73,7 +73,7 @@ async def update_task_status(task_id: int, status: str, code_submission: Optiona
             return
     logger.warning(f"Task {task_id} not found")
 
-async def get_tasks(status: str) -> List[Tuple]:
+async def get_tasks(status: str) -> list[Tuple]:
     """Get tasks by status."""
     data = await _load_data()
     tasks = []

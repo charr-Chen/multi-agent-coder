@@ -176,6 +176,9 @@ class CoderAgent:
             if success:
                 self.issues_completed += 1
                 self._store_success_memory(issue, {"code": improved_code})
+                
+                # ✨ 新增：显示详细的代码修改摘要
+                await self._display_code_modification_summary(issue, context, improved_code)
             
             completion_time = time.time() - start_time
             logger.info(f"⏱️ Issue完成时间: {completion_time:.2f}秒")
@@ -708,6 +711,9 @@ def enhanced_functionality():
             verification_content = await self.read_file_with_command(target_file)
             if verification_content and len(verification_content) > 0:
                 logger.info(f"✅ 文件修改验证成功: {target_file}")
+                
+                # 显示修改前后的差异
+                await self._show_file_diff_summary(target_file, original_content, modified_content, issue)
             else:
                 logger.error(f"❌ 文件修改验证失败: {target_file}")
                 return False
@@ -816,6 +822,245 @@ def enhanced_functionality():
         )
         
         logger.info("✅ 成功经验已存储到记忆中")
+
+    async def _display_code_modification_summary(self, issue: dict[str, Any], context: dict[str, Any], modified_code: str):
+        """显示详细的代码修改摘要"""
+        try:
+            file_operation = context.get('file_operation', {})
+            target_file = file_operation.get('target_file')
+            
+            if not target_file:
+                logger.info("📝 创建了新的代码文件")
+                return
+            
+            logger.info("="*80)
+            logger.info(f"📋 【代码修改摘要】- {self.agent_id}")
+            logger.info("="*80)
+            
+            # Issue信息
+            logger.info(f"🎯 处理的Issue: {issue.get('title', 'Unknown')}")
+            logger.info(f"📝 Issue描述: {issue.get('description', 'N/A')[:100]}...")
+            
+            # 修改的文件信息
+            logger.info(f"📂 修改的文件: {target_file}")
+            
+            # 显示原文件和修改后的文件大小比较
+            if self.user_project_path:
+                full_file_path = os.path.join(self.user_project_path, target_file)
+                try:
+                    # 尝试读取当前文件内容（修改后的）
+                    current_content = await self.read_file_with_command(full_file_path)
+                    if current_content:
+                        original_lines = len(current_content.split('\n'))
+                        modified_lines = len(modified_code.split('\n'))
+                        line_diff = modified_lines - original_lines
+                        
+                        logger.info(f"📊 文件大小变化:")
+                        logger.info(f"   原文件: {original_lines} 行")
+                        logger.info(f"   修改后: {modified_lines} 行")
+                        logger.info(f"   变化: {'+' if line_diff >= 0 else ''}{line_diff} 行")
+                    
+                except Exception as e:
+                    logger.debug(f"无法读取文件进行比较: {e}")
+            
+            # 尝试显示具体的修改内容概要
+            await self._show_modification_highlights(target_file, modified_code, issue)
+            
+            # Git提交信息
+            logger.info(f"📝 Git提交: 'Modify {target_file}: {issue.get('title', 'Issue fix')}'")
+            
+            logger.info("="*80)
+            logger.info(f"✅ 【{self.agent_id} 代码修改完成】")
+            logger.info("="*80)
+            
+        except Exception as e:
+            logger.error(f"❌ 显示代码修改摘要失败: {e}")
+
+    async def _show_modification_highlights(self, target_file: str, modified_code: str, issue: dict[str, Any]):
+        """显示代码修改亮点"""
+        try:
+            # 分析修改后的代码，提取关键信息
+            lines = modified_code.split('\n')
+            
+            # 统计代码结构
+            classes = [line.strip() for line in lines if line.strip().startswith('class ')]
+            functions = [line.strip() for line in lines if line.strip().startswith('def ')]
+            imports = [line.strip() for line in lines if line.strip().startswith(('import ', 'from '))]
+            
+            # 查找可能的新增内容（包含Issue关键词的行）
+            issue_keywords = [word.lower() for word in issue.get('title', '').split()]
+            relevant_lines = []
+            
+            for i, line in enumerate(lines):
+                line_lower = line.lower()
+                if any(keyword in line_lower for keyword in issue_keywords):
+                    if line.strip() and not line.strip().startswith('#'):  # 排除空行和注释
+                        relevant_lines.append((i+1, line.strip()))
+            
+            logger.info(f"🔍 代码结构概览:")
+            if classes:
+                logger.info(f"   📁 类: {len(classes)} 个")
+                for cls in classes[:3]:  # 最多显示3个
+                    logger.info(f"      - {cls}")
+            
+            if functions:
+                logger.info(f"   ⚙️ 函数: {len(functions)} 个")
+                for func in functions[:3]:  # 最多显示3个
+                    logger.info(f"      - {func}")
+            
+            if imports:
+                logger.info(f"   📦 导入: {len(imports)} 个模块")
+            
+            if relevant_lines:
+                logger.info(f"🎯 与Issue相关的代码行:")
+                for line_num, line_content in relevant_lines[:5]:  # 最多显示5行
+                    logger.info(f"   L{line_num}: {line_content[:80]}...")
+            
+            # 尝试使用LLM生成更智能的修改摘要
+            await self._generate_smart_modification_summary(target_file, modified_code, issue)
+            
+        except Exception as e:
+            logger.debug(f"显示修改亮点失败: {e}")
+
+    async def _generate_smart_modification_summary(self, target_file: str, modified_code: str, issue: dict[str, Any]):
+        """使用LLM生成智能的修改摘要"""
+        try:
+            # 截取代码的前500行，避免token过多
+            code_lines = modified_code.split('\n')
+            if len(code_lines) > 500:
+                truncated_code = '\n'.join(code_lines[:500]) + '\n... (代码已截断)'
+            else:
+                truncated_code = modified_code
+            
+            prompt = f"""
+请分析这段修改后的代码，并生成一个简洁的修改摘要。
+
+文件: {target_file}
+Issue: {issue.get('title', 'Unknown')}
+
+代码:
+```python
+{truncated_code}
+```
+
+请用中文提供一个简洁的修改摘要（不超过3行），格式如下：
+- 主要修改内容
+- 新增的功能或改进
+- 对用户的价值
+
+不要包含代码细节，只说明做了什么改动。
+"""
+            
+            response = await self.llm_manager.generate_code_from_prompt(prompt)
+            if response and response.strip():
+                logger.info(f"🤖 AI修改摘要:")
+                for line in response.strip().split('\n'):
+                    if line.strip():
+                        logger.info(f"   {line.strip()}")
+            
+        except Exception as e:
+            logger.debug(f"生成智能修改摘要失败: {e}")
+
+    async def _show_file_diff_summary(self, target_file: str, original_content: str, modified_content: str, issue: dict[str, Any]):
+        """显示文件修改的差异摘要"""
+        try:
+            original_lines = original_content.split('\n')
+            modified_lines = modified_content.split('\n')
+            
+            # 基本统计
+            original_line_count = len(original_lines)
+            modified_line_count = len(modified_lines)
+            line_diff = modified_line_count - original_line_count
+            
+            logger.info("📊 文件修改详情:")
+            logger.info(f"   📂 文件: {target_file}")
+            logger.info(f"   📏 原始行数: {original_line_count}")
+            logger.info(f"   📏 修改后行数: {modified_line_count}")
+            logger.info(f"   📈 行数变化: {'+' if line_diff >= 0 else ''}{line_diff}")
+            
+            # 尝试找出具体的修改区域
+            added_lines, removed_lines, modified_regions = self._analyze_code_differences(original_lines, modified_lines)
+            
+            if added_lines:
+                logger.info(f"   ➕ 新增行数: {len(added_lines)}")
+                # 显示部分新增的行
+                for i, line in enumerate(added_lines[:3]):
+                    logger.info(f"      + {line[:60]}...")
+                if len(added_lines) > 3:
+                    logger.info(f"      ... 还有 {len(added_lines) - 3} 行新增内容")
+            
+            if removed_lines:
+                logger.info(f"   ➖ 删除行数: {len(removed_lines)}")
+            
+            if modified_regions:
+                logger.info(f"   🔄 修改区域: {len(modified_regions)} 处")
+            
+            # 分析修改的主要内容
+            await self._analyze_modification_impact(original_content, modified_content, issue)
+            
+        except Exception as e:
+            logger.debug(f"显示文件差异摘要失败: {e}")
+
+    def _analyze_code_differences(self, original_lines: list[str], modified_lines: list[str]) -> tuple[list[str], list[str], list[dict]]:
+        """分析代码差异，返回新增行、删除行和修改区域"""
+        try:
+            # 简单的差异分析
+            original_set = set(enumerate(original_lines))
+            modified_set = set(enumerate(modified_lines))
+            
+            # 找出完全新增的行（在修改后出现但原来没有的内容）
+            original_content_set = set(line.strip() for line in original_lines if line.strip())
+            modified_content_set = set(line.strip() for line in modified_lines if line.strip())
+            
+            added_content = modified_content_set - original_content_set
+            removed_content = original_content_set - modified_content_set
+            
+            # 过滤掉空行和注释
+            added_lines = [line for line in added_content if line and not line.startswith('#')]
+            removed_lines = [line for line in removed_content if line and not line.startswith('#')]
+            
+            # 简单的修改区域检测（这里可以进一步优化）
+            modified_regions = []
+            if len(original_lines) != len(modified_lines):
+                modified_regions.append({
+                    'type': 'size_change',
+                    'description': f'文件大小从{len(original_lines)}行变为{len(modified_lines)}行'
+                })
+            
+            return added_lines, removed_lines, modified_regions
+            
+        except Exception as e:
+            logger.debug(f"分析代码差异失败: {e}")
+            return [], [], []
+
+    async def _analyze_modification_impact(self, original_content: str, modified_content: str, issue: dict[str, Any]):
+        """分析修改的影响和重要性"""
+        try:
+            # 分析关键字密度变化
+            issue_keywords = [word.lower() for word in issue.get('title', '').split() if len(word) > 2]
+            
+            original_keyword_count = sum(1 for keyword in issue_keywords for _ in range(original_content.lower().count(keyword)))
+            modified_keyword_count = sum(1 for keyword in issue_keywords for _ in range(modified_content.lower().count(keyword)))
+            
+            if modified_keyword_count > original_keyword_count:
+                logger.info(f"   🎯 Issue相关性: 提升 ({original_keyword_count} → {modified_keyword_count} 个相关关键词)")
+            
+            # 分析代码复杂度变化
+            original_functions = len([line for line in original_content.split('\n') if line.strip().startswith('def ')])
+            modified_functions = len([line for line in modified_content.split('\n') if line.strip().startswith('def ')])
+            
+            if modified_functions != original_functions:
+                logger.info(f"   ⚙️ 函数数量: {original_functions} → {modified_functions}")
+            
+            # 分析导入变化
+            original_imports = len([line for line in original_content.split('\n') if line.strip().startswith(('import ', 'from '))])
+            modified_imports = len([line for line in modified_content.split('\n') if line.strip().startswith(('import ', 'from '))])
+            
+            if modified_imports != original_imports:
+                logger.info(f"   📦 导入模块: {original_imports} → {modified_imports}")
+            
+        except Exception as e:
+            logger.debug(f"分析修改影响失败: {e}")
 
     async def _decide_file_operation(self, issue: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
         """智能决定文件操作策略 - CoderAgent只修改现有文件，且必须有合理依据"""

@@ -1,0 +1,12 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Version Control
+
+The imbecile user you'll be dealing with likely have no idea what version control even is.
+As such, it is your responsibility to configure the project with git and commit/branch/... when appropriate.
+Always check the status of the project and commit if you should,
+but don't commit too often; you should commit at feature addition, unit test addition, etc., just like a human developer.
+You have a terminal. Take advantage of that.

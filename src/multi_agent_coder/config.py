@@ -26,9 +26,9 @@ else:
 
 # LLM 配置
 LLM_CONFIG = {
-    "model": os.getenv("OPENAI_MODEL", "gpt-4"),
+    "model": os.getenv("OPENAI_MODEL"),  # 直接使用环境变量，不设置默认值
     "temperature": float(os.getenv("OPENAI_TEMPERATURE", "0.7")),
-    "max_tokens": int(os.getenv("OPENAI_MAX_TOKENS", "2000")),
+    "max_tokens": int(os.getenv("OPENAI_MAX_TOKENS", "1000")),
 }
 
 # 系统配置

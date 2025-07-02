@@ -30,7 +30,7 @@ class GitManager:
             repo_path: Git 仓库路径
         """
         self.repo_path = os.path.abspath(repo_path)
-        self.issues_file = os.path.join(self.repo_path, 'issues.json')  # 改为项目根目录
+        self.issues_file = os.path.join(self.repo_path, '.issues.json')  # 修复：使用.issues.json保持一致性
         self.lock_file = os.path.join(self.repo_path, '.git_operations.lock')
         
         # 确保repo路径存在且是git仓库
@@ -165,7 +165,7 @@ class GitManager:
         self._release_lock()
         logger.error(f"Git操作失败，已重试 {max_retries} 次: {last_exception}")
         raise last_exception
-
+    
     def _load_issues(self) -> dict[str, list[dict[str, Any]]]:
         """从文件加载issues"""
         if os.path.exists(self.issues_file):
@@ -225,7 +225,7 @@ class GitManager:
         # 提交更改
         def _commit_create():
             # 添加文件到Git
-            self._run_git_command(['add', 'issues.json'])
+            self._run_git_command(['add', '.issues.json'])
             # 提交
             self._run_git_command(['commit', '-m', f'创建 Issue: {title}'])
         
@@ -265,14 +265,14 @@ class GitManager:
                     self._save_issues(data)
                     return True
             return False
-        
+                
         # 使用重试机制分配issue
         try:
             success = await self._retry_with_backoff(_assign)
             if success:
                 # 提交更改
                 def _commit_assign():
-                    self._run_git_command(['add', 'issues.json'])
+                    self._run_git_command(['add', '.issues.json'])
                     self._run_git_command(['commit', '-m', f'分配 Issue {issue_id} 给 {assignee}'])
                 
                 try:
@@ -309,13 +309,13 @@ class GitManager:
                     self._save_issues(data)
                     return True
             return False
-        
+                
         try:
             success = await self._retry_with_backoff(_update)
             if success:
                 # 提交更改
                 def _commit_update():
-                    self._run_git_command(['add', 'issues.json'])
+                    self._run_git_command(['add', '.issues.json'])
                     self._run_git_command(['commit', '-m', f'更新 Issue {issue_id} 状态为 {status}'])
                 
                 try:

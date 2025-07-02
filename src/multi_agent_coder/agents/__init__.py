@@ -6,14 +6,10 @@ Agent 模块
 
 from .commenter import CommenterAgent
 from .coder import CoderAgent
-from .thinking import MemoryManager, Planner, RequirementAnalyzer, ToolExecutor, SelfReviewer
+from .thinking import MemoryManager
 
 __all__ = [
     'CommenterAgent', 
     'CoderAgent',
-    'MemoryManager',
-    'Planner', 
-    'RequirementAnalyzer',
-    'ToolExecutor',
-    'SelfReviewer'
+    'MemoryManager'
 ] 

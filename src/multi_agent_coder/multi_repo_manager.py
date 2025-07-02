@@ -121,8 +121,7 @@ class MultiRepoManager:
             agent仓库的GitManager
         """
         
-        # 使用绝对路径，避免相对路径问题
-        agent_repo_path = os.path.abspath(os.path.join(self.agent_repos_dir, f"agent_{agent_id}"))
+        agent_repo_path = os.path.join(self.agent_repos_dir, f"agent_{agent_id}")
         
         try:
             if os.path.exists(agent_repo_path):
@@ -193,9 +192,6 @@ class MultiRepoManager:
             'Thumbs.db',
             '.env',
             '.env.*',
-            # 🆕 避免循环复制agent_repos目录
-            'agent_repos',
-            'agent_repos/*',
             # 只忽略可能导致冲突的特定文件
             'node_modules',  # npm依赖
             '.pytest_cache',  # pytest缓存
@@ -267,9 +263,8 @@ class MultiRepoManager:
             if not self.playground_git_manager:
                 logger.error("Playground仓库未初始化")
                 return False
-
-            # 使用绝对路径，避免相对路径问题
-            agent_repo_path = os.path.abspath(os.path.join(self.agent_repos_dir, f"agent_{agent_id}"))
+            
+            agent_repo_path = os.path.join(self.agent_repos_dir, f"agent_{agent_id}")
             
             # 检查agent仓库是否存在
             if not os.path.exists(agent_repo_path):
@@ -423,18 +418,16 @@ class MultiRepoManager:
             是否清理成功
         """
         try:
-            # 使用绝对路径，避免相对路径问题
-            agent_repo_path = os.path.abspath(os.path.join(self.agent_repos_dir, f"agent_{agent_id}"))
-            
+            agent_repo_path = os.path.join(self.agent_repos_dir, f"agent_{agent_id}")
             if os.path.exists(agent_repo_path):
                 shutil.rmtree(agent_repo_path)
                 logger.info(f"清理agent仓库: {agent_repo_path}")
             
-            # 从管理器中移除
             if agent_id in self.agent_git_managers:
                 del self.agent_git_managers[agent_id]
             
             return True
+            
         except Exception as e:
             logger.error(f"清理agent仓库失败: {e}")
             return False

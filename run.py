@@ -397,21 +397,26 @@ async def main():
             except Exception as e:
                 logger.error(f"❌ 同步Issues到playground失败: {e}")
             
-            # 🆕 创建协作管理器（使用playground仓库作为主仓库）
-            collaboration_manager = CollaborationManager(playground_git_manager, llm_manager)
+            # 🆕 创建协作管理器（使用playground仓库作为主仓库，使用独立的LLM管理器）
+            collaboration_llm_manager = LLMManager(api_key, proxy_url=proxy_url)
+            collaboration_manager = CollaborationManager(playground_git_manager, collaboration_llm_manager)
             logger.info("✅ 创建协作管理器")
             
+            # 🆕 为Commenter创建独立的LLM管理器，避免并发竞争
+            commenter_llm_manager = LLMManager(api_key, proxy_url=proxy_url)
             # 创建评论员代理（使用playground仓库）
-            commenter = CommenterAgent("commenter", playground_git_manager, llm_manager)
+            commenter = CommenterAgent("commenter", playground_git_manager, commenter_llm_manager)
             commenter.set_collaboration_manager(collaboration_manager)
             
-            # 创建编码员代理（每个使用独立仓库）
+            # 创建编码员代理（每个使用独立仓库和独立的LLM管理器）
             coders = []
             for i in range(config["system"]["num_coders"]):
                 agent_id = f"coder_{i}"
                 # 为每个coder设置独立仓库
                 agent_git_manager = await multi_repo_manager.setup_agent_repo(agent_id)
-                coder = CoderAgent(agent_git_manager, llm_manager, agent_id)
+                # 🆕 为每个coder创建独立的LLM管理器，避免并发竞争
+                coder_llm_manager = LLMManager(api_key, proxy_url=proxy_url)
+                coder = CoderAgent(agent_git_manager, coder_llm_manager, agent_id)
                 # 设置playground仓库管理器，用于访问Issues
                 coder.set_playground_git_manager(playground_git_manager)
                 # 设置协作管理器，启用Pull Request流程
@@ -436,14 +441,17 @@ async def main():
             # 初始化 Git 管理器
             git_manager = GitManager(repo_path)
             
-            # 创建评论员代理
-            commenter = CommenterAgent("commenter", git_manager, llm_manager)
+            # 创建评论员代理（使用独立的LLM管理器）
+            commenter_llm_manager = LLMManager(api_key, proxy_url=proxy_url)
+            commenter = CommenterAgent("commenter", git_manager, commenter_llm_manager)
             
-            # 创建编码员代理
-            coders = [
-                CoderAgent(git_manager, llm_manager, f"coder_{i}")
-                for i in range(config["system"]["num_coders"])
-            ]
+            # 创建编码员代理（每个使用独立的LLM管理器）
+            coders = []
+            for i in range(config["system"]["num_coders"]):
+                # 🆕 为每个coder创建独立的LLM管理器，避免并发竞争
+                coder_llm_manager = LLMManager(api_key, proxy_url=proxy_url)
+                coder = CoderAgent(git_manager, coder_llm_manager, f"coder_{i}")
+                coders.append(coder)
         
         # 启动所有代理
         print("\n" + "=" * 60)
@@ -451,6 +459,20 @@ async def main():
         print(f"📊 系统配置: 1个Commenter + {len(coders)}个Coder")
         print(f"📁 工作仓库: {user_repo_path}")
         print("⏳ 请稍等，系统正在初始化...")
+        print("=" * 60)
+        print()
+        
+        # 🆕 增加用户指导信息
+        print("💡 系统启动完成后，你可以:")
+        print("   1️⃣  查看日志文件: multi_agent_coder.log")
+        print("   2️⃣  检查工作成果: python check_agents_work.py")
+        print("   3️⃣  查看Memory记录: ls -la .memory/")
+        print("   4️⃣  查看工作报告: ls -la reports/ 或 agent_repos/playground/reports/")
+        print("   5️⃣  查看代码提交: cd agent_repos/playground && git log --oneline")
+        print("   6️⃣  使用 Ctrl+C 停止系统")
+        print()
+        print("🔍 实时监控AI Agents工作状态...")
+        print("⚠️  如果长时间没有输出，可能是网络问题或LLM API调用失败")
         print("=" * 60)
         print()
         

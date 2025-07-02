@@ -654,4 +654,248 @@ class MemoryManager:
             
         except Exception as e:
             logger.error(f"导入记忆失败: {e}")
-            return False 
+            return False
+    
+    def store_ai_decision(self, context: str, decision: str, reasoning: str = None, 
+                         alternatives: list[str] = None, confidence: float = None,
+                         impact: str = None) -> str:
+        """存储AI的自主决策
+        
+        Args:
+            context: 决策上下文
+            decision: 决策内容
+            reasoning: 决策理由
+            alternatives: 其他可选方案
+            confidence: 信心度
+            impact: 预期影响
+            
+        Returns:
+            记忆ID
+        """
+        content = {
+            "context": context,
+            "decision": decision,
+            "reasoning": reasoning,
+            "alternatives": alternatives or [],
+            "confidence": confidence,
+            "impact": impact,
+            "timestamp": time.time()
+        }
+        
+        return self.store_memory(
+            MemoryType.DECISION_LOG,
+            content,
+            keywords=self._extract_keywords_from_text(f"{context} {decision}"),
+            priority=MemoryPriority.HIGH if confidence and confidence > 0.8 else MemoryPriority.MEDIUM,
+            tags=["ai_decision", "autonomous"]
+        )
+    
+    def store_workflow_insight(self, workflow_type: str, insight: str, 
+                             efficiency_score: float = None, 
+                             improvement_suggestions: list[str] = None) -> str:
+        """存储工作流程洞察
+        
+        Args:
+            workflow_type: 工作流程类型
+            insight: 洞察内容
+            efficiency_score: 效率评分
+            improvement_suggestions: 改进建议
+            
+        Returns:
+            记忆ID
+        """
+        content = {
+            "workflow_type": workflow_type,
+            "insight": insight,
+            "efficiency_score": efficiency_score,
+            "improvement_suggestions": improvement_suggestions or [],
+            "timestamp": time.time()
+        }
+        
+        return self.store_memory(
+            MemoryType.WORKFLOW_PATTERN,
+            content,
+            keywords=[workflow_type, "workflow", "insight"],
+            priority=MemoryPriority.MEDIUM,
+            tags=["workflow", "optimization"]
+        )
+    
+    def store_collaboration_note(self, partner_id: str, interaction_type: str,
+                               note: str, outcome: str = None, 
+                               next_actions: list[str] = None) -> str:
+        """存储协作笔记
+        
+        Args:
+            partner_id: 协作伙伴ID
+            interaction_type: 交互类型
+            note: 笔记内容
+            outcome: 结果
+            next_actions: 后续行动
+            
+        Returns:
+            记忆ID
+        """
+        content = {
+            "partner_id": partner_id,
+            "interaction_type": interaction_type,
+            "note": note,
+            "outcome": outcome,
+            "next_actions": next_actions or [],
+            "timestamp": time.time()
+        }
+        
+        return self.store_memory(
+            MemoryType.COLLABORATION_NOTE,
+            content,
+            keywords=[partner_id, interaction_type, "collaboration"],
+            priority=MemoryPriority.MEDIUM,
+            tags=["collaboration", "interaction"]
+        )
+    
+    def store_context_understanding(self, context_type: str, understanding: str,
+                                  confidence: float = None, 
+                                  related_contexts: list[str] = None) -> str:
+        """存储上下文理解
+        
+        Args:
+            context_type: 上下文类型
+            understanding: 理解内容
+            confidence: 理解信心度
+            related_contexts: 相关上下文
+            
+        Returns:
+            记忆ID
+        """
+        content = {
+            "context_type": context_type,
+            "understanding": understanding,
+            "confidence": confidence,
+            "related_contexts": related_contexts or [],
+            "timestamp": time.time()
+        }
+        
+        return self.store_memory(
+            MemoryType.CONTEXT_UNDERSTANDING,
+            content,
+            keywords=[context_type, "context", "understanding"],
+            priority=MemoryPriority.HIGH if confidence and confidence > 0.8 else MemoryPriority.MEDIUM,
+            tags=["context", "understanding"]
+        )
+    
+    def store_strategy_plan(self, strategy_name: str, plan: str, 
+                          objectives: list[str] = None, timeline: str = None,
+                          success_metrics: list[str] = None) -> str:
+        """存储策略计划
+        
+        Args:
+            strategy_name: 策略名称
+            plan: 计划内容
+            objectives: 目标列表
+            timeline: 时间线
+            success_metrics: 成功指标
+            
+        Returns:
+            记忆ID
+        """
+        content = {
+            "strategy_name": strategy_name,
+            "plan": plan,
+            "objectives": objectives or [],
+            "timeline": timeline,
+            "success_metrics": success_metrics or [],
+            "timestamp": time.time()
+        }
+        
+        return self.store_memory(
+            MemoryType.STRATEGY_PLAN,
+            content,
+            keywords=[strategy_name, "strategy", "plan"],
+            priority=MemoryPriority.HIGH,
+            tags=["strategy", "planning"]
+        )
+    
+    def get_ai_decisions(self, context_keywords: list[str] = None, 
+                        limit: int = 10) -> list[Memory]:
+        """获取AI决策记录
+        
+        Args:
+            context_keywords: 上下文关键词
+            limit: 返回数量限制
+            
+        Returns:
+            AI决策记忆列表
+        """
+        return self.retrieve_memories(
+            query_keywords=context_keywords or [],
+            memory_type=MemoryType.DECISION_LOG,
+            limit=limit
+        )
+    
+    def get_workflow_insights(self, workflow_type: str = None, 
+                            limit: int = 10) -> list[Memory]:
+        """获取工作流程洞察
+        
+        Args:
+            workflow_type: 工作流程类型
+            limit: 返回数量限制
+            
+        Returns:
+            工作流程洞察列表
+        """
+        memories = self.retrieve_memories(
+            query_keywords=[workflow_type] if workflow_type else [],
+            memory_type=MemoryType.WORKFLOW_PATTERN,
+            limit=limit
+        )
+        return memories
+    
+    def get_collaboration_history(self, partner_id: str = None, 
+                                limit: int = 10) -> list[Memory]:
+        """获取协作历史
+        
+        Args:
+            partner_id: 伙伴ID
+            limit: 返回数量限制
+            
+        Returns:
+            协作历史列表
+        """
+        return self.retrieve_memories(
+            query_keywords=[partner_id] if partner_id else ["collaboration"],
+            memory_type=MemoryType.COLLABORATION_NOTE,
+            limit=limit
+        )
+    
+    def get_context_understandings(self, context_type: str = None, 
+                                 limit: int = 10) -> list[Memory]:
+        """获取上下文理解记录
+        
+        Args:
+            context_type: 上下文类型
+            limit: 返回数量限制
+            
+        Returns:
+            上下文理解列表
+        """
+        return self.retrieve_memories(
+            query_keywords=[context_type] if context_type else ["context"],
+            memory_type=MemoryType.CONTEXT_UNDERSTANDING,
+            limit=limit
+        )
+    
+    def get_strategy_plans(self, strategy_name: str = None, 
+                         limit: int = 10) -> list[Memory]:
+        """获取策略计划
+        
+        Args:
+            strategy_name: 策略名称
+            limit: 返回数量限制
+            
+        Returns:
+            策略计划列表
+        """
+        return self.retrieve_memories(
+            query_keywords=[strategy_name] if strategy_name else ["strategy"],
+            memory_type=MemoryType.STRATEGY_PLAN,
+            limit=limit
+        ) 

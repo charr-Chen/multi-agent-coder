@@ -36,115 +36,218 @@ class CoderAgent:
         logger.info(f"编码员代理初始化完成: {agent_id}")
 
     async def work_on_issue(self, issue: dict[str, Any]) -> bool:
-        """主入口：处理一个issue"""
-        logger.info(f"🚀 {self.agent_id} 开始处理Issue: {issue.get('title')}")
+        """处理指定的Issue
         
+        Args:
+            issue: Issue信息
+            
+        Returns:
+            是否成功处理
+        """
         try:
-            # 1. 收集上下文
+            logger.info(f"🤖 {self.agent_id} 开始处理Issue: {issue.get('title', '未知任务')}")
+            
+            # 构建上下文
             context = await self.build_context(issue)
             
-            # 2. 让AI决定怎么做（prompt驱动）
-            result, thoughts = await self.run_llm_task("implement_issue", context)
+            # 运行LLM任务
+            result, thoughts = await self.run_llm_task("coding", context)
             
-            # 3. 检查LLM响应是否有效
-            if not result:
-                logger.error(f"❌ {self.agent_id} LLM返回空结果")
-                return False
-            
-            # 4. 检查是否是错误响应或fallback响应
-            if isinstance(result, dict):
-                if "error" in result:
-                    logger.error(f"❌ {self.agent_id} LLM返回错误: {result['error']}")
-                    return False
-                # 检查是否是fallback响应（包含"fallback_"前缀的文件名）
-                if isinstance(result.get("file_path"), str) and result["file_path"].startswith("fallback_"):
-                    logger.warning(f"⚠️ {self.agent_id} 收到fallback响应，LLM调用可能失败")
-                    # 仍然创建fallback文件，让用户知道出了问题
-            
-            # 5. 应用结果（如写文件、提交等）
+            # 应用结果
             modified_files = await self.apply_result(result, context)
             
-            # 6. 🆕 只有真正创建了文件才算成功
-            if not modified_files:
-                logger.error(f"❌ {self.agent_id} 没有生成任何文件")
+            if modified_files:
+                logger.info(f"✅ {self.agent_id} 成功修改 {len(modified_files)} 个文件")
+                
+                # 🆕 智能存储记忆
+                await self._store_intelligent_memory(issue, result, modified_files, thoughts)
+                
+                # 创建Pull Request（如果启用了协作模式）
+                if hasattr(self, 'collaboration_manager') and self.collaboration_manager:
+                    await self.create_pull_request_for_changes(issue, modified_files, context)
+                
+                # 生成工作报告
+                await self.generate_user_report(issue, modified_files, thoughts)
+                
+                # 🆕 自动同步工作到playground仓库
+                if hasattr(self, 'multi_repo_manager') and self.multi_repo_manager:
+                    try:
+                        logger.info(f"🔄 {self.agent_id} 开始同步工作到playground...")
+                        sync_success = await self.multi_repo_manager.sync_agent_work_to_playground(self.agent_id)
+                        if sync_success:
+                            logger.info(f"✅ {self.agent_id} 成功同步工作到playground")
+                        else:
+                            logger.warning(f"⚠️ {self.agent_id} 同步工作到playground失败")
+                    except Exception as e:
+                        logger.error(f"❌ {self.agent_id} 同步工作异常: {e}")
+                
+                # 更新Issue状态
+                if hasattr(self, 'playground_git_manager') and self.playground_git_manager:
+                    await self.playground_git_manager.update_issue_status(
+                        issue['id'], 
+                        'completed',
+                        f"由 {self.agent_id} 完成，修改了 {len(modified_files)} 个文件"
+                    )
+                
+                return True
+            else:
+                logger.warning(f"⚠️ {self.agent_id} 没有产生任何文件修改")
+                # 🆕 即使没有修改文件，也存储失败经验
+                await self._store_intelligent_memory(issue, result, [], thoughts)
                 return False
-            
-            logger.info(f"✅ {self.agent_id} 成功创建/修改了 {len(modified_files)} 个文件: {', '.join(modified_files)}")
-            
-            # 7. 🆕 如果有文件修改，创建PR
-            if modified_files and self.collaboration_manager:
-                pr_id = await self.create_pull_request_for_changes(
-                    issue=issue,
-                    modified_files=modified_files,
-                    context=context
-                )
-                if pr_id:
-                    logger.info(f"🎉 {self.agent_id} 成功创建PR: {pr_id}")
-                else:
-                    logger.warning(f"⚠️ {self.agent_id} PR创建失败")
-            
-            # 8. 存储AI思考链到Memory
-            for thought in thoughts:
-                self.memory_manager.store_thinking_process(
-                    thought.get("thought", ""),
-                    context=thought.get("context", {}),
-                    conclusion=thought.get("conclusion", None),
-                    confidence=thought.get("confidence", None)
-                )
-            
-            # 9. 🆕 存储完成的Issue信息到Memory
-            self.memory_manager.store_memory(
-                memory_type=MemoryType.DECISION_LOG,
-                content={
-                    "action": "完成Issue",
-                    "issue_title": issue.get('title', ''),
-                    "issue_description": issue.get('description', ''),
-                    "modified_files": modified_files,
-                    "success": True,
-                    "notes": f"成功实现Issue，创建了{len(modified_files)}个文件"
-                },
-                keywords=["issue", "完成", "实现"],
-                priority=MemoryPriority.HIGH
-            )
-            
-            # 10. 🆕 生成用户报告
-            await self.generate_user_report(issue, modified_files, thoughts)
-            
-            logger.info(f"✅ {self.agent_id} 完成Issue: {issue.get('title')}")
-            return True
-            
+                
         except Exception as e:
             logger.error(f"❌ {self.agent_id} 处理Issue失败: {e}")
             import traceback
-            logger.error(f"🔍 错误详情:\n{traceback.format_exc()}")
-            
-            # 🆕 存储失败信息到Memory
-            try:
-                self.memory_manager.store_memory(
-                    memory_type=MemoryType.ERROR_PATTERN,
-                    content={
-                        "action": "处理Issue失败",
-                        "issue_title": issue.get('title', ''),
-                        "error": str(e),
-                        "traceback": traceback.format_exc(),
-                        "success": False
-                    },
-                    keywords=["issue", "失败", "错误"],
-                    priority=MemoryPriority.HIGH
-                )
-            except:
-                logger.error("存储错误信息到Memory也失败了")
-            
+            logger.debug(f"🔍 错误详情:\n{traceback.format_exc()}")
             return False
 
     async def build_context(self, issue: dict[str, Any]) -> dict[str, Any]:
-        """收集上下文（相关memory、相关文件内容等）"""
-        # 只取最近的思考过程
-        recent_thoughts = self.memory_manager.get_recent_thinking_processes(limit=5)
+        """构建工作上下文
+        
+        Args:
+            issue: Issue信息
+            
+        Returns:
+            上下文字典
+        """
+        # 获取最近的思考过程
+        recent_thoughts = []
+        if hasattr(self, 'memory_manager'):
+            recent_memories = self.memory_manager.get_recent_thinking_processes(5)
+            for memory in recent_memories:
+                recent_thoughts.append(memory.content)
+        
+        # 🆕 智能上下文分析
+        context_analysis = await self._analyze_context(issue)
+        
+        # 🆕 存储上下文理解
+        if hasattr(self, 'memory_manager'):
+            self.memory_manager.store_context_understanding(
+                context_type="issue_analysis",
+                understanding=context_analysis,
+                confidence=0.8,
+                related_contexts=[issue.get('title', ''), issue.get('description', '')]
+            )
+        
         return {
             "issue": issue,
-            "recent_thoughts": [t.content for t in recent_thoughts],
+            "recent_thoughts": recent_thoughts,
+            "context_analysis": context_analysis,
+            "agent_id": self.agent_id
         }
+    
+    async def _analyze_context(self, issue: dict[str, Any]) -> str:
+        """分析Issue上下文
+        
+        Args:
+            issue: Issue信息
+            
+        Returns:
+            上下文分析结果
+        """
+        try:
+            # 构建分析prompt
+            analysis_prompt = f"""
+请分析以下Issue的上下文，包括：
+1. 技术栈和架构要求
+2. 功能复杂度评估
+3. 与其他模块的依赖关系
+4. 实现策略建议
+5. 潜在风险和注意事项
+
+Issue标题: {issue.get('title', '')}
+Issue描述: {issue.get('description', '')}
+
+请提供简洁但全面的分析：
+"""
+            
+            # 调用LLM进行分析
+            response = await self.llm_manager.chat_completion(
+                messages=[{"role": "user", "content": analysis_prompt}],
+                temperature=0.3
+            )
+            
+            if response and isinstance(response, str):
+                return response
+            else:
+                return "无法分析上下文"
+                
+        except Exception as e:
+            logger.warning(f"上下文分析失败: {e}")
+            return "上下文分析失败"
+    
+    async def _store_intelligent_memory(self, issue: dict[str, Any], result: Any, 
+                                      modified_files: list[str], thoughts: list[dict]):
+        """智能存储记忆
+        
+        Args:
+            issue: Issue信息
+            result: LLM结果
+            modified_files: 修改的文件
+            thoughts: 思考过程
+        """
+        if not hasattr(self, 'memory_manager'):
+            return
+        
+        try:
+            # 1. 存储AI决策
+            decision_summary = f"处理Issue: {issue.get('title', '')}"
+            reasoning = f"修改了 {len(modified_files)} 个文件: {', '.join(modified_files)}"
+            
+            self.memory_manager.store_ai_decision(
+                context=issue.get('description', ''),
+                decision=decision_summary,
+                reasoning=reasoning,
+                confidence=0.9 if modified_files else 0.5,
+                impact=f"创建/修改了 {len(modified_files)} 个文件"
+            )
+            
+            # 2. 存储工作流程洞察
+            workflow_insight = f"成功处理Issue，使用了 {len(thoughts)} 个思考步骤"
+            improvement_suggestions = []
+            
+            if len(modified_files) == 0:
+                improvement_suggestions.append("需要改进代码生成策略")
+            elif len(modified_files) > 3:
+                improvement_suggestions.append("考虑将复杂任务分解为更小的单元")
+            
+            self.memory_manager.store_workflow_insight(
+                workflow_type="issue_processing",
+                insight=workflow_insight,
+                efficiency_score=0.8 if modified_files else 0.3,
+                improvement_suggestions=improvement_suggestions
+            )
+            
+            # 3. 存储学习经验
+            if modified_files:
+                lesson = f"成功实现Issue，关键文件: {modified_files[0] if modified_files else '无'}"
+                self.memory_manager.store_learning_experience(
+                    lesson=lesson,
+                    context=issue.get('description', ''),
+                    success=True,
+                    improvement="继续优化代码质量和架构设计"
+                )
+            
+            # 4. 存储创意想法（如果有）
+            if isinstance(result, dict) and result.get("operation") == "enhance":
+                self.memory_manager.store_creative_idea(
+                    idea=f"增强了现有功能: {issue.get('title', '')}",
+                    category="feature_enhancement",
+                    potential_impact="提升用户体验和系统功能",
+                    implementation_notes=f"修改了 {len(modified_files)} 个文件"
+                )
+            
+            # 5. 存储TODO项目（如果需要后续工作）
+            if len(modified_files) > 2:
+                self.memory_manager.store_todo_item(
+                    task=f"测试和验证 {issue.get('title', '')} 的实现",
+                    priority="high",
+                    status="pending"
+                )
+            
+        except Exception as e:
+            logger.warning(f"智能记忆存储失败: {e}")
 
     async def run_llm_task(self, task_type: str, context: dict[str, Any]) -> tuple[Any, list[dict]]:
         """通过prompt驱动LLM完成任务，返回结果和AI思考链"""
@@ -155,21 +258,59 @@ class CoderAgent:
         return llm_response, []
 
     async def apply_result(self, result: Any, context: dict[str, Any]) -> list[str]:
-        """应用LLM结果，如写文件、提交等，返回修改的文件列表"""
+        """应用LLM返回的结果到文件系统
+        
+        Args:
+            result: LLM返回的结果
+            context: 上下文信息
+            
+        Returns:
+            修改的文件列表
+        """
         modified_files = []
         
         if isinstance(result, dict) and "file_path" in result and "code" in result:
             file_path = result["file_path"]
             full_path = os.path.join(self.user_project_path, file_path)
             
+            # 检查是否需要修改现有文件
+            is_existing_file = os.path.exists(full_path)
+            
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             
+            # 如果是现有文件，先读取原内容用于对比
+            original_content = ""
+            if is_existing_file:
+                try:
+                    with open(full_path, 'r', encoding='utf-8') as f:
+                        original_content = f.read()
+                except Exception as e:
+                    logger.warning(f"读取现有文件失败 {file_path}: {e}")
+            
+            # 写入新内容
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(result["code"])
-            logger.info(f"📝 写入文件: {file_path}")
+            
+            action = "修改" if is_existing_file else "创建"
+            logger.info(f"📝 {action}文件: {file_path}")
+            
+            # 记录文件变更到memory
+            if hasattr(self, 'memory_manager'):
+                self.memory_manager.store_memory(
+                    MemoryType.FILE_ANALYSIS,
+                    {
+                        "action": action,
+                        "file_path": file_path,
+                        "original_content_length": len(original_content),
+                        "new_content_length": len(result["code"]),
+                        "has_changes": original_content != result["code"]
+                    },
+                    keywords=[file_path.split('/')[-1], action],
+                    tags=["file_operation"]
+                )
             
             await self.git_manager.commit_changes(
-                f"实现: {context['issue'].get('title', '')}", 
+                f"{action}: {context['issue'].get('title', '')}", 
                 [file_path]
             )
             modified_files.append(file_path)
@@ -180,16 +321,47 @@ class CoderAgent:
                     file_path = file_result["file_path"]
                     full_path = os.path.join(self.user_project_path, file_path)
                     
+                    # 检查是否需要修改现有文件
+                    is_existing_file = os.path.exists(full_path)
+                    
                     os.makedirs(os.path.dirname(full_path), exist_ok=True)
                     
+                    # 如果是现有文件，先读取原内容用于对比
+                    original_content = ""
+                    if is_existing_file:
+                        try:
+                            with open(full_path, 'r', encoding='utf-8') as f:
+                                original_content = f.read()
+                        except Exception as e:
+                            logger.warning(f"读取现有文件失败 {file_path}: {e}")
+                    
+                    # 写入新内容
                     with open(full_path, "w", encoding="utf-8") as f:
                         f.write(file_result["code"])
-                    logger.info(f"📝 写入文件: {file_path}")
+                    
+                    action = "修改" if is_existing_file else "创建"
+                    logger.info(f"📝 {action}文件: {file_path}")
+                    
+                    # 记录文件变更到memory
+                    if hasattr(self, 'memory_manager'):
+                        self.memory_manager.store_memory(
+                            MemoryType.FILE_ANALYSIS,
+                            {
+                                "action": action,
+                                "file_path": file_path,
+                                "original_content_length": len(original_content),
+                                "new_content_length": len(file_result["code"]),
+                                "has_changes": original_content != file_result["code"]
+                            },
+                            keywords=[file_path.split('/')[-1], action],
+                            tags=["file_operation"]
+                        )
+                    
                     modified_files.append(file_path)
             
             if modified_files:
                 await self.git_manager.commit_changes(
-                    f"实现: {context['issue'].get('title', '')}", 
+                    f"批量修改: {context['issue'].get('title', '')}", 
                     modified_files
                 )
                 
@@ -214,6 +386,13 @@ class CoderAgent:
 【历史思考链】:
 {recent_thoughts}
 
+【重要指导】:
+1. 优先修改现有文件而不是创建新文件，除非确实需要新文件
+2. 如果修改现有文件，请保持原有的代码结构和风格
+3. 在修改前先分析现有代码的逻辑和结构
+4. 确保修改后的代码与现有代码兼容
+5. 如果创建新文件，请考虑是否应该放在合适的目录结构中
+
 请严格按如下JSON格式输出：
 {{
   "thoughts": [
@@ -222,7 +401,8 @@ class CoderAgent:
   ],
   "result": {{
     "file_path": "要写入的文件路径（相对项目根目录）",
-    "code": "完整代码内容"
+    "code": "完整代码内容",
+    "operation": "create|modify|enhance"
   }}
 }}
 
@@ -230,10 +410,15 @@ class CoderAgent:
 {{
   "thoughts": [...],
   "result": [
-    {{"file_path": "file1.py", "code": "..."}},
-    {{"file_path": "file2.py", "code": "..."}}
+    {{"file_path": "file1.py", "code": "...", "operation": "modify"}},
+    {{"file_path": "file2.py", "code": "...", "operation": "create"}}
   ]
 }}
+
+operation字段说明：
+- create: 创建新文件
+- modify: 修改现有文件
+- enhance: 增强现有文件功能
 """
 
     def set_playground_git_manager(self, playground_git_manager):

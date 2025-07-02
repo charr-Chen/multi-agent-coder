@@ -250,85 +250,95 @@ class MultiRepoManager:
         
         logger.info(f"✅ 完成复制，共复制了 {copied_files} 个文件")
     
-    async def sync_agent_to_playground(self, agent_id: str) -> bool:
+    async def sync_agent_work_to_playground(self, agent_id: str) -> bool:
         """将agent的工作同步到playground仓库
         
         Args:
-            agent_id: agent ID
+            agent_id: 代理ID
             
         Returns:
             是否同步成功
         """
         try:
-            if not self.playground_git_manager:
-                logger.error("Playground仓库未初始化")
-                return False
-            
-            agent_repo_path = os.path.join(self.agent_repos_dir, f"agent_{agent_id}")
-            
-            # 检查agent仓库是否存在
+            agent_repo_path = os.path.join(self.agent_repos_dir, agent_id)
             if not os.path.exists(agent_repo_path):
-                logger.error(f"Agent仓库不存在: {agent_repo_path}")
+                logger.warning(f"Agent仓库不存在: {agent_repo_path}")
                 return False
             
-            logger.info(f"🔄 开始同步 {agent_id} 的工作到playground...")
-            synced_files = 0
+            # 获取agent仓库的最新提交
+            agent_git = GitManager(agent_repo_path)
+            playground_git = self.playground_git_manager
             
-            # 复制agent的工作到playground
-            # 这里可以实现更智能的合并策略
-            for root, dirs, files in os.walk(agent_repo_path):
-                # 跳过.git目录
-                if '.git' in dirs:
-                    dirs.remove('.git')
+            # 检查agent仓库是否有新提交
+            try:
+                agent_status = agent_git._run_git_command(['status', '--porcelain'], check_output=True)
+                if not agent_status.strip():
+                    logger.debug(f"Agent {agent_id} 没有新改动需要同步")
+                    return True
+            except Exception as e:
+                logger.warning(f"检查agent {agent_id} 状态失败: {e}")
+                return False
+            
+            # 获取agent仓库中新增或修改的文件
+            try:
+                # 获取所有已跟踪的文件
+                tracked_files = agent_git._run_git_command(['ls-files'], check_output=True).split('\n')
+                tracked_files = [f.strip() for f in tracked_files if f.strip()]
                 
-                for file in files:
-                    if file.startswith('.'):
+                # 获取未提交的改动
+                diff_files = agent_git._run_git_command(['diff', '--name-only'], check_output=True).split('\n')
+                diff_files = [f.strip() for f in diff_files if f.strip()]
+                
+                # 获取新增文件
+                untracked_files = agent_git._run_git_command(['ls-files', '--others', '--exclude-standard'], check_output=True).split('\n')
+                untracked_files = [f.strip() for f in untracked_files if f.strip()]
+                
+                # 合并所有需要同步的文件
+                files_to_sync = list(set(tracked_files + diff_files + untracked_files))
+                
+                if not files_to_sync:
+                    logger.debug(f"Agent {agent_id} 没有文件需要同步")
+                    return True
+                
+                logger.info(f"同步 {len(files_to_sync)} 个文件从 {agent_id} 到 playground")
+                
+                # 复制文件到playground
+                copied_count = 0
+                for file_path in files_to_sync:
+                    if not file_path:
                         continue
                     
-                    src_file = os.path.join(root, file)
-                    rel_path = os.path.relpath(src_file, agent_repo_path)
-                    dst_file = os.path.join(self.playground_path, rel_path)
+                    src_file = os.path.join(agent_repo_path, file_path)
+                    dst_file = os.path.join(playground_git.repo_path, file_path)
                     
-                    # 确保目标目录存在
-                    dst_dir = os.path.dirname(dst_file)
-                    if dst_dir:
-                        os.makedirs(dst_dir, exist_ok=True)
-                    
-                    try:
+                    if os.path.exists(src_file):
+                        # 确保目标目录存在
+                        dst_dir = os.path.dirname(dst_file)
+                        if dst_dir:
+                            os.makedirs(dst_dir, exist_ok=True)
+                        
                         # 复制文件
+                        import shutil
                         shutil.copy2(src_file, dst_file)
-                        synced_files += 1
-                        logger.debug(f"📄 同步文件: {rel_path}")
-                    except Exception as e:
-                        logger.warning(f"⚠️ 跳过文件 {rel_path}: {e}")
-            
-            logger.info(f"📦 同步了 {synced_files} 个文件")
-            
-            # 提交到playground仓库
-            commit_hash = await self.playground_git_manager.commit_changes(
-                f"同步来自 {agent_id} 的工作",
-                ["."]
-            )
-            
-            if commit_hash:
-                logger.info(f"✅ 同步提交成功: {commit_hash[:8]}")
-            else:
-                logger.info("📝 没有新的更改需要提交")
-            
-            # 只有在有远程仓库时才推送
-            if self.playground_repo_url and self.playground_repo_url.strip():
-                await self.playground_git_manager.push_changes()
-                logger.info("📤 已推送到远程仓库")
-            else:
-                logger.debug("本地仓库模式，跳过推送到远程")
-            
-            logger.info(f"✅ 成功同步 {agent_id} 的工作到playground")
-            return True
-            
+                        copied_count += 1
+                        logger.debug(f"同步文件: {file_path}")
+                
+                if copied_count > 0:
+                    # 提交到playground
+                    commit_message = f"同步 {agent_id} 的工作成果 ({copied_count} 个文件)"
+                    await playground_git.commit_changes(commit_message, files_to_sync)
+                    logger.info(f"✅ 成功同步 {copied_count} 个文件从 {agent_id} 到 playground")
+                    return True
+                else:
+                    logger.warning(f"没有文件被成功同步从 {agent_id}")
+                    return False
+                    
+            except Exception as e:
+                logger.error(f"同步文件失败: {e}")
+                return False
+                
         except Exception as e:
-            logger.error(f"❌ 同步agent工作到playground失败: {e}")
-            import traceback
-            logger.debug(f"🔍 同步错误详情:\n{traceback.format_exc()}")
+            logger.error(f"同步agent {agent_id} 工作失败: {e}")
             return False
     
     async def sync_playground_to_agents(self) -> bool:

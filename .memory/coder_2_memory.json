@@ -1,0 +1,180 @@
+{
+  "agent_id": "coder_2",
+  "timestamp": 1751443981.616374,
+  "memories": [
+    {
+      "id": "context_understanding_1751443929493",
+      "memory_type": "context_understanding",
+      "content": {
+        "context_type": "issue_analysis",
+        "understanding": "上下文分析失败",
+        "confidence": 0.8,
+        "related_contexts": [
+          "支持表格格式数据的上传和解析，能够识别表格结构和内容（包括Excel、CSV等格式）",
+          "实现 支持表格格式数据的上传和解析，能够识别表格结构和内容（包括Excel、CSV等格式）"
+        ],
+        "timestamp": 1751443929.49377
+      },
+      "created_at": 1751443929.493772,
+      "last_accessed": 1751443929.493772,
+      "access_count": 0,
+      "keywords": [
+        "issue_analysis",
+        "context",
+        "understanding"
+      ],
+      "priority": "medium",
+      "status": "active",
+      "tags": [
+        "context",
+        "understanding"
+      ],
+      "related_memories": [],
+      "expiration_time": null
+    },
+    {
+      "id": "decision_log_1751443950381",
+      "memory_type": "decision_log",
+      "content": {
+        "context": "实现 支持表格格式数据的上传和解析，能够识别表格结构和内容（包括Excel、CSV等格式）",
+        "decision": "处理Issue: 支持表格格式数据的上传和解析，能够识别表格结构和内容（包括Excel、CSV等格式）",
+        "reasoning": "修改了 0 个文件: ",
+        "alternatives": [],
+        "confidence": 0.5,
+        "impact": "创建/修改了 0 个文件",
+        "timestamp": 1751443950.3815
+      },
+      "created_at": 1751443950.3815732,
+      "last_accessed": 1751443950.3815732,
+      "access_count": 0,
+      "keywords": [
+        "处理issue:",
+        "支持表格格式数据的上传和解析，能够识别表格结构和内容（包括excel、csv等格式）"
+      ],
+      "priority": "medium",
+      "status": "active",
+      "tags": [
+        "ai_decision",
+        "autonomous"
+      ],
+      "related_memories": [],
+      "expiration_time": null
+    },
+    {
+      "id": "workflow_pattern_1751443950382",
+      "memory_type": "workflow_pattern",
+      "content": {
+        "workflow_type": "issue_processing",
+        "insight": "成功处理Issue，使用了 0 个思考步骤",
+        "efficiency_score": 0.3,
+        "improvement_suggestions": [
+          "需要改进代码生成策略"
+        ],
+        "timestamp": 1751443950.382316
+      },
+      "created_at": 1751443950.382324,
+      "last_accessed": 1751443950.382324,
+      "access_count": 0,
+      "keywords": [
+        "issue_processing",
+        "workflow",
+        "insight"
+      ],
+      "priority": "medium",
+      "status": "active",
+      "tags": [
+        "workflow",
+        "optimization"
+      ],
+      "related_memories": [],
+      "expiration_time": null
+    },
+    {
+      "id": "context_understanding_1751443960387",
+      "memory_type": "context_understanding",
+      "content": {
+        "context_type": "issue_analysis",
+        "understanding": "上下文分析失败",
+        "confidence": 0.8,
+        "related_contexts": [
+          "支持表格格式数据的上传和解析，能够识别表格结构和内容（包括Excel、CSV等格式）",
+          "实现 支持表格格式数据的上传和解析，能够识别表格结构和内容（包括Excel、CSV等格式）"
+        ],
+        "timestamp": 1751443960.386977
+      },
+      "created_at": 1751443960.387006,
+      "last_accessed": 1751443960.387006,
+      "access_count": 0,
+      "keywords": [
+        "issue_analysis",
+        "context",
+        "understanding"
+      ],
+      "priority": "medium",
+      "status": "active",
+      "tags": [
+        "context",
+        "understanding"
+      ],
+      "related_memories": [],
+      "expiration_time": null
+    },
+    {
+      "id": "decision_log_1751443981615",
+      "memory_type": "decision_log",
+      "content": {
+        "context": "实现 支持表格格式数据的上传和解析，能够识别表格结构和内容（包括Excel、CSV等格式）",
+        "decision": "处理Issue: 支持表格格式数据的上传和解析，能够识别表格结构和内容（包括Excel、CSV等格式）",
+        "reasoning": "修改了 0 个文件: ",
+        "alternatives": [],
+        "confidence": 0.5,
+        "impact": "创建/修改了 0 个文件",
+        "timestamp": 1751443981.615381
+      },
+      "created_at": 1751443981.615411,
+      "last_accessed": 1751443981.615411,
+      "access_count": 0,
+      "keywords": [
+        "处理issue:",
+        "支持表格格式数据的上传和解析，能够识别表格结构和内容（包括excel、csv等格式）"
+      ],
+      "priority": "medium",
+      "status": "active",
+      "tags": [
+        "ai_decision",
+        "autonomous"
+      ],
+      "related_memories": [],
+      "expiration_time": null
+    },
+    {
+      "id": "workflow_pattern_1751443981616",
+      "memory_type": "workflow_pattern",
+      "content": {
+        "workflow_type": "issue_processing",
+        "insight": "成功处理Issue，使用了 0 个思考步骤",
+        "efficiency_score": 0.3,
+        "improvement_suggestions": [
+          "需要改进代码生成策略"
+        ],
+        "timestamp": 1751443981.616365
+      },
+      "created_at": 1751443981.61637,
+      "last_accessed": 1751443981.61637,
+      "access_count": 0,
+      "keywords": [
+        "issue_processing",
+        "workflow",
+        "insight"
+      ],
+      "priority": "medium",
+      "status": "active",
+      "tags": [
+        "workflow",
+        "optimization"
+      ],
+      "related_memories": [],
+      "expiration_time": null
+    }
+  ]
+}

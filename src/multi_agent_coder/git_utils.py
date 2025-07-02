@@ -356,12 +356,18 @@ class GitManager:
             except subprocess.CalledProcessError:
                 pass
             
-            # 提交
-            self._run_git_command(['commit', '-m', message])
+            # 确保提交信息不为空且正确格式化
+            if not message or message.strip() == "":
+                commit_message = "Auto commit by Multi-Agent Coder"
+            else:
+                commit_message = message.strip()
+            
+            # 提交 - 修复：确保提交信息正确引用
+            self._run_git_command(['commit', '-m', commit_message])
             
             # 获取提交hash
             commit_hash = self._run_git_command(['rev-parse', 'HEAD'], check_output=True)
-            logger.info(f"提交更改: {message}")
+            logger.info(f"提交更改: {commit_message}")
             return commit_hash
         
         try:

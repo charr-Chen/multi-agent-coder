@@ -1,0 +1,123 @@
+{
+  "agent_id": "coder_0",
+  "timestamp": 1751443970.784153,
+  "memories": [
+    {
+      "id": "context_understanding_1751443929490",
+      "memory_type": "context_understanding",
+      "content": {
+        "context_type": "issue_analysis",
+        "understanding": "上下文分析失败",
+        "confidence": 0.8,
+        "related_contexts": [
+          "支持图片文件的上传、存储及预处理（如图像格式转换、大小调整等）",
+          "实现 支持图片文件的上传、存储及预处理（如图像格式转换、大小调整等）"
+        ],
+        "timestamp": 1751443929.490678
+      },
+      "created_at": 1751443929.490719,
+      "last_accessed": 1751443929.490719,
+      "access_count": 0,
+      "keywords": [
+        "issue_analysis",
+        "context",
+        "understanding"
+      ],
+      "priority": "medium",
+      "status": "active",
+      "tags": [
+        "context",
+        "understanding"
+      ],
+      "related_memories": [],
+      "expiration_time": null
+    },
+    {
+      "id": "decision_log_1751443960779",
+      "memory_type": "decision_log",
+      "content": {
+        "context": "实现 支持图片文件的上传、存储及预处理（如图像格式转换、大小调整等）",
+        "decision": "处理Issue: 支持图片文件的上传、存储及预处理（如图像格式转换、大小调整等）",
+        "reasoning": "修改了 0 个文件: ",
+        "alternatives": [],
+        "confidence": 0.5,
+        "impact": "创建/修改了 0 个文件",
+        "timestamp": 1751443960.779883
+      },
+      "created_at": 1751443960.7799199,
+      "last_accessed": 1751443960.7799199,
+      "access_count": 0,
+      "keywords": [
+        "支持图片文件的上传、存储及预处理（如图像格式转换、大小调整等）",
+        "处理issue:"
+      ],
+      "priority": "medium",
+      "status": "active",
+      "tags": [
+        "ai_decision",
+        "autonomous"
+      ],
+      "related_memories": [],
+      "expiration_time": null
+    },
+    {
+      "id": "workflow_pattern_1751443960780",
+      "memory_type": "workflow_pattern",
+      "content": {
+        "workflow_type": "issue_processing",
+        "insight": "成功处理Issue，使用了 0 个思考步骤",
+        "efficiency_score": 0.3,
+        "improvement_suggestions": [
+          "需要改进代码生成策略"
+        ],
+        "timestamp": 1751443960.780828
+      },
+      "created_at": 1751443960.780837,
+      "last_accessed": 1751443960.780837,
+      "access_count": 0,
+      "keywords": [
+        "issue_processing",
+        "workflow",
+        "insight"
+      ],
+      "priority": "medium",
+      "status": "active",
+      "tags": [
+        "workflow",
+        "optimization"
+      ],
+      "related_memories": [],
+      "expiration_time": null
+    },
+    {
+      "id": "context_understanding_1751443970784",
+      "memory_type": "context_understanding",
+      "content": {
+        "context_type": "issue_analysis",
+        "understanding": "上下文分析失败",
+        "confidence": 0.8,
+        "related_contexts": [
+          "支持图片文件的上传、存储及预处理（如图像格式转换、大小调整等）",
+          "实现 支持图片文件的上传、存储及预处理（如图像格式转换、大小调整等）"
+        ],
+        "timestamp": 1751443970.784139
+      },
+      "created_at": 1751443970.7841458,
+      "last_accessed": 1751443970.7841458,
+      "access_count": 0,
+      "keywords": [
+        "issue_analysis",
+        "context",
+        "understanding"
+      ],
+      "priority": "medium",
+      "status": "active",
+      "tags": [
+        "context",
+        "understanding"
+      ],
+      "related_memories": [],
+      "expiration_time": null
+    }
+  ]
+}

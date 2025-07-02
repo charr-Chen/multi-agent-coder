@@ -5,489 +5,485 @@
 <a name="english"></a>
 # Multi-Agent Coder
 
-A sophisticated code generation system based on multi-agent collaboration, simulating real development team cooperation with GitHub-style workflow and advanced code modification tracking.
+A sophisticated AI-powered collaborative coding system that simulates real development teams with GitHub-style workflows, intelligent code generation, and advanced project management capabilities.
 
 ## 🚀 Key Features
 
-### Advanced Collaboration System
-- **Pull Request Workflow**: GitHub-style code review and merge process
-- **Multi-Repository Architecture**: Independent workspaces for each agent
-- **Intelligent Code Review**: LLM-powered code quality assessment
-- **Automatic Conflict Resolution**: Smart merge strategies and conflict handling
-- **Real-time Code Modification Tracking**: Detailed summaries of what agents changed
+### 🎯 Interactive Project Setup
+- **Universal Project Support**: Works with any Git repository - local projects, GitHub repos, or create new ones
+- **One-Click GitHub Integration**: Automatically clone and setup GitHub repositories
+- **Smart Project Detection**: Intelligently identifies and handles complex project structures
+- **Auto-initialization**: Automatically sets up Git repositories and required files
+- **Path Validation**: Ensures all paths are valid and accessible
 
-### Latest Improvements ✨
-- **🔍 Detailed Code Modification Summaries**: Users can now see exactly what each agent modified
-- **📊 File Diff Analysis**: Line-by-line changes with impact analysis
-- **🤖 AI-Generated Change Descriptions**: Smart summaries of modifications
-- **⚡ Optimized Issue Assignment**: Intelligent issue distribution without false failures
-- **🛠️ Fixed File Write Operations**: Reliable code modifications with 100% accuracy
+### 🤖 Advanced AI Collaboration
+- **Multi-Agent Architecture**: Multiple AI agents working together like a real development team
+- **GitHub-Style Workflow**: Complete Pull Request workflow with code review and merging
+- **Intelligent Code Generation**: Context-aware code modifications with project structure analysis
+- **Real-time Collaboration**: Agents coordinate work and avoid conflicts automatically
+- **Detailed Change Tracking**: See exactly what each agent modified with comprehensive summaries
+
+### 🔧 Latest Improvements ✨
+- **🌐 GitHub Repository Cloning**: Direct support for GitHub URLs with automatic cloning
+- **🎯 Interactive Startup Experience**: User-friendly setup process with clear guidance
+- **📁 Smart Project Detection**: Automatically detects and handles special project structures
+- **🔄 Enhanced Synchronization**: Improved project content synchronization between repositories
+- **📊 Detailed Modification Reports**: Comprehensive summaries of all code changes
+- **⚡ Optimized Performance**: Better resource management and faster operations
 
 ### System Components
 
-#### Commenter Agent
-- LLM-based agent responsible for determining development tasks
-- Continuously monitors codebase status
-- Creates and manages issues based on user requirements
-- Reviews code submissions and Pull Requests
-- Determines task completion status
+#### 🗣️ Commenter Agent
+- **Project Analysis**: Analyzes project requirements and creates development tasks
+- **Issue Management**: Creates, assigns, and tracks development issues
+- **Code Review**: Reviews Pull Requests with AI-powered quality assessment
+- **Progress Monitoring**: Tracks project progress and task completion
 
-#### Coder Agents
-- LLM-based agents responsible for implementing code
-- Asynchronously monitor and acquire tasks
-- Implement code in separate branches with intelligent file targeting
-- Create Pull Requests for code review
-- Provide detailed modification summaries
-- Handle code conflicts and synchronization
+#### 👨‍💻 Coder Agents
+- **Intelligent Implementation**: Develops features based on project analysis
+- **Context-Aware Coding**: Understands project structure before making changes
+- **Independent Workspaces**: Each agent has its own repository for conflict-free development
+- **Quality Assurance**: Provides detailed modification summaries and change tracking
 
-#### Collaboration Manager
-- Manages the entire collaboration workflow
-- Pull Request creation, review, and merging
-- Branch management and cleanup
-- Code synchronization across all agents
-- Conflict resolution
+#### 🔗 Collaboration Manager
+- **Workflow Orchestration**: Manages the complete development workflow
+- **Conflict Resolution**: Automatically handles merge conflicts and code synchronization
+- **Branch Management**: Creates, manages, and cleans up feature branches
+- **Integration Control**: Coordinates work between all agents
 
-## 🔄 Collaboration Workflow
+## 🔄 Development Workflow
 
 ```mermaid
 graph TD
-    A[User describes requirements] --> B[Commenter analyzes and creates Issues]
-    B --> C[Coder intelligently grabs Issue]
-    C --> D[Coder analyzes project structure]
-    D --> E[Smart file targeting and modification]
-    E --> F[Generate detailed modification summary]
-    F --> G[Create Pull Request with changes]
-    G --> H[Commenter reviews PR]
+    A["🎯 User provides project/requirements"] --> B["🔍 Commenter analyzes and creates Issues"]
+    B --> C["⚡ Coder agents claim issues intelligently"]
+    C --> D["📐 Project structure analysis"]
+    D --> E["🛠️ Smart code implementation"]
+    E --> F["📋 Generate detailed change summary"]
+    F --> G["📤 Create Pull Request"]
+    G --> H["👀 Commenter reviews changes"]
     H --> I{Review Result}
-    I -->|Approved| J[Auto-merge to main repo]
-    I -->|Rejected| K[Return feedback]
-    J --> L[Sync all agents]
+    I -->|✅ Approved| J["🔄 Auto-merge to main"]
+    I -->|❌ Rejected| K["💭 Provide feedback"]
+    J --> L["🔄 Sync all agents"]
     K --> E
 ```
 
-### Multi-Repository Architecture
-
-- **Main Repository (playground)**: Stores final merged code and Issues
-- **Agent Repositories**: Each Coder has an independent workspace
-- **Branch Management**: Each PR is developed in an isolated feature branch
-
-## 📁 Project Structure
+## 📁 Project Architecture
 
 ```
 multi-agent-coder/
-├── run.py                    # Main entry point with interactive setup
+├── run.py                    # 🚀 Interactive main entry point
 ├── src/
 │   └── multi_agent_coder/
-│       ├── __init__.py
-│       ├── config.py         # Configuration
-│       ├── git_utils.py      # Git operations
-│       ├── llm_utils.py      # LLM interface
-│       ├── collaboration.py  # Collaboration manager
-│       ├── multi_repo_manager.py  # Multi-repo management
-│       ├── storage.py        # Data persistence
+│       ├── config.py         # ⚙️ System configuration
+│       ├── git_utils.py      # 🔧 Git operations
+│       ├── llm_utils.py      # 🤖 LLM interface
+│       ├── collaboration.py  # 🤝 Collaboration manager
+│       ├── multi_repo_manager.py  # 📚 Multi-repository management
 │       └── agents/
-│           ├── __init__.py
-│           ├── commenter.py  # Commenter agent
-│           ├── coder.py      # Enhanced Coder agent with modification tracking
-│           └── thinking/     # Advanced agent capabilities
-│               ├── memory_manager.py
-│               ├── planner.py
-│               └── reviewer.py
-├── agent_repos/              # Agent working directories (auto-created)
-│   ├── playground/           # Main collaboration repo
-│   ├── agent_coder_0/        # Coder 0 workspace
-│   ├── agent_coder_1/        # Coder 1 workspace
-│   └── agent_coder_2/        # Coder 2 workspace
-├── .issues.json              # Issues storage
+│           ├── commenter.py  # 🗣️ Commenter agent
+│           ├── coder.py      # 👨‍💻 Enhanced Coder agent
+│           └── thinking/     # 🧠 Advanced AI capabilities
+│               └── memory_manager.py
+├── agent_repos/              # 🏢 Auto-created agent workspaces
+│   ├── playground/           # 🎮 Main collaboration repository
+│   ├── agent_coder_0/        # 👨‍💻 Coder 0 workspace
+│   ├── agent_coder_1/        # 👨‍💻 Coder 1 workspace
+│   └── agent_coder_2/        # 👨‍💻 Coder 2 workspace
+├── .issues.json              # 📋 Issues tracking
 ├── README.md
 ├── requirements.txt
-├── pyproject.toml
-└── .gitignore
+└── pyproject.toml
 ```
 
-## ⚡ Installation
+## ⚡ Quick Start
 
-1. Clone the repository:
+### 1. Installation
+
 ```bash
+# Clone the repository
 git clone https://github.com/charr-Chen/multi-agent-coder.git
 cd multi-agent-coder
-```
 
-2. Install dependencies:
-```bash
-# Using pip
+# Install dependencies (choose one)
 pip install -r requirements.txt
-
-# Or using uv (recommended)
+# OR (recommended for faster installation)
 uv sync
 ```
 
-3. Set up environment variables:
+### 2. Environment Setup
+
 ```bash
-export OPENAI_API_KEY="your-api-key"
-export OPENAI_PROXY_URL="your-proxy-url"  # Optional
+# Required: Set your OpenAI API key
+export OPENAI_API_KEY="your-api-key-here"
+
+# Optional: Set proxy if needed
+export OPENAI_PROXY_URL="your-proxy-url"
 ```
 
-## 🚀 Usage
-
-### 🎯 Interactive Startup (Recommended)
+### 3. Launch the System
 
 ```bash
 python run.py
 ```
 
-The system will interactively ask you which Git repository to use:
+## 🎯 Interactive Setup Experience
+
+When you run the system, you'll see a user-friendly setup process:
 
 ```
 ============================================================
 🚀 Multi-Agent Coder - AI Collaborative Programming System
 ============================================================
 
-💡 Specify the Git repository to use:
-   - Can be an existing project repository
-   - Can be a newly created empty repository
+💡 Please specify the Git repository to use:
+   - Local project path (e.g., /path/to/project)
+   - GitHub repository URL (e.g., https://github.com/user/repo.git)
    - Leave empty to use current directory
 
-📁 Git repository path: /path/to/your/project
+📁 Git repository path or URL: 
 ```
 
-**Features**:
-- ✅ **Auto-initialization**: Offers to initialize if not a Git repository
-- ✅ **Auto-creates Issues file**: Ensures `.issues.json` file exists
-- ✅ **Path validation**: Ensures path is valid and accessible
-- ✅ **User-friendly**: Clear prompts and error handling
+### 📋 Supported Input Types
 
-### ⚙️ Environment Variable Configuration
+| Input Type | Example | Description |
+|------------|---------|-------------|
+| **Local Path** | `/home/user/my-project` | Use existing local project |
+| **GitHub HTTPS** | `https://github.com/user/repo.git` | Clone from GitHub |
+| **GitHub SSH** | `git@github.com:user/repo.git` | Clone via SSH |
+| **Empty** | `(press Enter)` | Use current directory |
+
+### 🌟 What Happens During Setup
+
+1. **🔍 Path Validation**: Ensures the path/URL is valid and accessible
+2. **📥 Auto-Cloning**: Automatically clones GitHub repositories to local directory
+3. **🔧 Git Initialization**: Offers to initialize Git if not already a repository
+4. **📋 Issues Setup**: Creates and manages the `.issues.json` file
+5. **🎯 Smart Detection**: Detects special project structures (like AgentGPT)
+6. **📁 Content Synchronization**: Copies project content to collaboration workspace
+
+## 🎉 Advanced Features
+
+### 🌐 GitHub Integration
+
+The system seamlessly integrates with GitHub:
 
 ```bash
-export REPO_PATH="/path/to/your/repo"
-export USE_SEPARATE_REPOS="true"  # Recommended multi-repo mode
-python run.py
+# When you provide a GitHub URL, the system:
+# 1. Validates the repository
+# 2. Clones it to a local directory
+# 3. Sets up the collaboration environment
+# 4. Handles naming conflicts automatically
+
+📁 Git repository path or URL: https://github.com/microsoft/vscode.git
+🌐 Detected GitHub repository: https://github.com/microsoft/vscode.git
+📥 Cloning repository to: vscode
+✅ Successfully cloned repository: /current/path/vscode
 ```
 
-### 📝 Configuration File Method
+### 🧠 Smart Project Detection
 
-Create a `.env` file:
-```bash
-OPENAI_API_KEY=your-api-key
-REPO_PATH=/path/to/your/repo
-USE_SEPARATE_REPOS=true
-NUM_CODERS=2
-```
+The system intelligently handles different project types:
 
-## 🎉 What's New in Latest Version
+- **🎯 Complex Projects**: Detects multi-module projects and handles them appropriately
+- **📦 Monorepos**: Understands monorepo structures and focuses on relevant parts
+- **🔍 Reference Projects**: When run in the multi-agent-coder directory, automatically detects AgentGPT as a reference project
+- **📁 Empty Projects**: Handles new/empty repositories by setting up basic structure
 
-### 📋 Detailed Code Modification Summaries
+### 📊 Detailed Change Tracking
 
-When a Coder Agent completes code modifications, users will see:
+Every code modification includes comprehensive information:
 
 ```
 ================================================================================
 📋 【Code Modification Summary】- coder_0
 ================================================================================
-🎯 Processed Issue: Image Upload Feature Development
-📝 Issue Description: Implement user interface and backend interface...
-📂 Modified File: upload_service.py
-📊 File Size Changes:
-   Original: 120 lines
-   Modified: 145 lines
-   Change: +25 lines
-🔍 Code Structure Overview:
-   📁 Classes: 2 total
-      - class UploadService:
-      - class ImageProcessor:
-   ⚙️ Functions: 8 total
-      - def upload_image(self, file):
-      - def validate_image(self, file):
-🎯 Issue-related Code Lines:
-   L23: def upload_image(self, file_data, allowed_types=['jpg', 'png'])...
-   L45: # Image upload security check...
-   ➕ Added Lines: 18
-      + def validate_image_format(self, file_path):
-      + # Supported image format check
-      + if not self._is_safe_image(file_data):
-      ... 15 more added lines
-🤖 AI Modification Summary:
-   - Added image upload functionality module supporting multiple formats
-   - Enhanced image format validation and security check mechanisms
-   - Provided users with secure and reliable image upload capabilities
-📝 Git Commit: 'Modify upload_service.py: Image Upload Feature Development'
-================================================================================
-✅ 【coder_0 Code Modification Complete】
+🎯 Processed Issue: Add user authentication system
+📝 Issue Description: Implement JWT-based authentication with login/logout...
+📂 Modified Files: 
+   - src/auth/auth_service.py (+45 lines)
+   - src/middleware/auth_middleware.py (+32 lines)
+   - tests/test_auth.py (+28 lines)
+📊 Project Impact:
+   ✅ Added 3 new files
+   🔧 Modified 0 existing files
+   ➕ Total lines added: 105
+🔍 Code Structure:
+   📁 Classes: 3 new
+      - class AuthService
+      - class AuthMiddleware  
+      - class TestAuth
+   ⚙️ Functions: 8 new
+      - def authenticate_user()
+      - def generate_jwt_token()
+      - def validate_token()
+      ...
+🤖 AI Summary:
+   - Implemented complete JWT-based authentication system
+   - Added secure token generation and validation
+   - Included comprehensive unit tests
+   - Follows security best practices
+📝 Git Commit: 'feat: Add JWT authentication system'
 ================================================================================
 ```
-
-### 🔧 Enhanced Issue Assignment
-
-- **Smart Issue Distribution**: No more false "assignment failed" messages
-- **Concurrent Agent Handling**: Proper handling of multiple agents competing for issues
-- **Intelligent Retry Logic**: Reduced unnecessary repeated attempts
-
-### 🛠️ Reliable File Operations
-
-- **Fixed File Write System**: Replaced unreliable shell commands with Python file operations
-- **100% Content Accuracy**: No more content corruption during file modifications
-- **Proper Error Handling**: Better error messages and recovery mechanisms
 
 ## ⚙️ Configuration
 
-Configure in `src/multi_agent_coder/config.py`:
+### System Configuration
+
+Edit `src/multi_agent_coder/config.py`:
 
 ```python
 SYSTEM_CONFIG = {
-    "use_separate_repos": True,          # Enable multi-repo mode
-    "num_coders": 3,                     # Number of Coder agents
-    "playground_repo": "",               # Main repo URL (empty for local)
-    "agent_repos_dir": "agent_repos"     # Agent repositories directory
+    "use_separate_repos": True,      # Multi-repository mode (recommended)
+    "num_coders": 3,                 # Number of Coder agents
+    "playground_repo": "",           # Main collaboration repository
+    "agent_repos_dir": "agent_repos" # Agent repositories directory
 }
 ```
 
-## 📊 System Monitoring
+### Environment Variables
 
-### Pull Request Status
-- `open`: Awaiting review
-- `approved`: Review passed
-- `rejected`: Review failed
-- `merged`: Successfully merged
+```bash
+# Core settings
+export OPENAI_API_KEY="your-api-key"
+export OPENAI_PROXY_URL="proxy-url"  # Optional
 
-### Issue Status
-- `open`: Available for assignment
-- `assigned`: Assigned to an agent
-- `review`: Under code review
-- `completed`: Task completed
+# Advanced settings
+export USE_SEPARATE_REPOS="true"     # Enable multi-repo mode
+export NUM_CODERS="3"                # Number of coding agents
+export REPO_PATH="/path/to/project"  # Override project path
+```
 
-## 🛠️ Advanced Features
+## 📊 Monitoring & Status
 
-### Intelligent File Targeting
-- **Project Structure Analysis**: Agents analyze the codebase before making changes
-- **Smart File Matching**: LLM-powered file selection based on issue requirements
-- **Contextual Modifications**: Changes are made with full understanding of project architecture
+### Pull Request Lifecycle
+- `🔄 open`: Awaiting review
+- `✅ approved`: Review passed, ready to merge
+- `❌ rejected`: Review failed, needs changes
+- `🔀 merged`: Successfully integrated
 
-### Real-time Modification Tracking
-- **Line-by-line Diff Analysis**: See exactly what changed
-- **Impact Assessment**: Understand the implications of modifications
-- **AI-generated Summaries**: Human-readable descriptions of technical changes
+### Issue Management
+- `📋 open`: Available for assignment
+- `👨‍💻 assigned`: Being worked on by an agent
+- `👀 review`: Code review in progress
+- `✅ completed`: Task finished successfully
 
-### Enhanced Branch Management
-- Automatic feature branch creation
-- Smart branch cleanup after merge
-- Conflict detection and resolution
+## 🛠️ Advanced Capabilities
 
-### Advanced Code Synchronization
-- Real-time sync between agent repositories
-- Automatic conflict resolution
-- Rollback mechanisms
+### 🎯 Intelligent Code Generation
+- **Context Awareness**: Understands project structure and coding patterns
+- **Quality Assurance**: Follows best practices and coding standards
+- **Error Handling**: Includes proper error handling and edge cases
+- **Documentation**: Generates appropriate comments and documentation
 
-### Intelligent Code Review
-- LLM-powered code quality assessment
-- Detailed feedback and suggestions
-- Automatic approval for high-quality code
+### 🔄 Multi-Repository Synchronization
+- **Conflict Prevention**: Agents work in isolated environments
+- **Smart Merging**: Automatic conflict resolution with human oversight
+- **Content Sync**: Keeps all repositories up-to-date with latest changes
+- **Rollback Support**: Easy rollback if issues arise
+
+### 📈 Performance Optimization
+- **Parallel Processing**: Multiple agents work simultaneously
+- **Resource Management**: Efficient use of API calls and system resources
+- **Caching**: Intelligent caching of project analysis and context
+- **Background Tasks**: Non-blocking operations for better responsiveness
 
 ## 🔧 Dependencies
 
-- Python 3.9+
-- GitPython: Git operations
-- aiofiles: Asynchronous file operations
-- openai: LLM interface
-- python-dotenv: Environment variable management
-- asyncio: Asynchronous programming support
-- pydantic: Data validation
-- coloredlogs: Enhanced logging
+- **Python 3.9+**: Modern Python features and performance
+- **GitPython**: Git operations and repository management
+- **OpenAI**: LLM interface for AI capabilities
+- **AsyncIO**: Asynchronous programming for better performance
+- **Pydantic**: Data validation and settings management
+- **Coloredlogs**: Enhanced logging with colors
+- **Aiofiles**: Asynchronous file operations
 
 ## 🎯 Best Practices
 
+### Project Setup
+- Use descriptive repository names
+- Include a clear project description
+- Ensure proper Git configuration
+- Set up appropriate .gitignore files
+
 ### Issue Creation
-- Clear functional requirements
-- Specific implementation details
-- Expected output format
+- Write clear, actionable requirements
+- Include specific acceptance criteria
+- Provide context and examples
+- Break down complex tasks
 
 ### Code Quality
-- Follow Python coding standards
-- Add necessary comments
-- Include error handling
-
-### Pull Request Management
-- One PR per Issue
-- Clear change descriptions
-- Respond to review feedback promptly
+- Follow language-specific conventions
+- Include comprehensive tests
+- Add meaningful comments
+- Handle errors gracefully
 
 ## 🚨 Troubleshooting
 
-1. **Environment Setup**: Ensure OpenAI API key is correctly set
-2. **Network Connection**: LLM calls require stable internet
-3. **Storage Space**: Multi-repo mode uses more disk space
-4. **File Permissions**: Ensure write permissions in working directory
-5. **Git Configuration**: Ensure Git is properly configured with user details
+### Common Issues & Solutions
 
-### Common Issues
+#### 🔑 API Key Issues
+```bash
+# Error: "❌ OpenAI API key not set"
+export OPENAI_API_KEY="your-actual-api-key"
+```
 
-#### Issue Assignment Failures
-- **Fixed**: The latest version properly handles concurrent issue assignment
-- **Solution**: No action needed, system now intelligently manages agent competition
+#### 🌐 Network Connectivity
+```bash
+# For proxy environments
+export OPENAI_PROXY_URL="http://proxy-server:port"
+```
 
-#### File Modification Not Working
-- **Fixed**: Replaced shell-based file operations with reliable Python file I/O
-- **Solution**: Update to latest version for 100% reliable file modifications
+#### 📁 Permission Issues
+```bash
+# Ensure write permissions
+chmod -R 755 /path/to/project
+```
 
-#### Missing Modification Details
-- **Fixed**: Added comprehensive modification summaries and diff analysis
-- **Solution**: Users now see detailed information about all code changes
+#### 🔧 Git Configuration
+```bash
+# Set up Git user information
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+```
 
-## 🔮 Future Plans
+### Performance Tips
 
-- [ ] Support for complex merge strategies
-- [ ] Integration with code quality tools (ESLint, Black, etc.)
-- [ ] Remote Git repository support
-- [ ] Web interface for monitoring
-- [ ] Custom review rules support
-- [ ] Multi-language support beyond Python
-- [ ] Integration with CI/CD pipelines
+1. **🚀 Use Multi-Repo Mode**: Better performance and conflict avoidance
+2. **⚡ Optimize API Usage**: Monitor and optimize API call frequency
+3. **💾 Manage Disk Space**: Multi-repo mode uses more disk space
+4. **🔄 Regular Cleanup**: Periodically clean up old branches and repositories
+
+## 🔮 Roadmap
+
+### Near Term (Next Release)
+- [ ] 🌍 Multi-language support (JavaScript, TypeScript, Java)
+- [ ] 🔌 Plugin system for custom tools
+- [ ] 📊 Web dashboard for monitoring
+- [ ] 🔄 Automatic dependency management
+
+### Medium Term
+- [ ] ☁️ Cloud deployment options
+- [ ] 🔗 Integration with popular IDEs
+- [ ] 📈 Advanced analytics and reporting
+- [ ] 🤖 Custom AI model support
+
+### Long Term
+- [ ] 🌐 Distributed agent network
+- [ ] 🎯 Industry-specific templates
+- [ ] 🔒 Enterprise security features
+- [ ] 📱 Mobile app for monitoring
 
 ## 🤝 Contributing
 
-Issues and Pull Requests are welcome! Please see our contributing guidelines.
+We welcome contributions from the community! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+
+### Development Setup
+
+```bash
+# Fork and clone the repository
+git clone https://github.com/your-username/multi-agent-coder.git
+
+# Create a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+# Run tests
+python -m pytest
+```
 
 ## 📄 License
 
-MIT License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
 <a name="简体中文"></a>
 # Multi-Agent Coder
 
-基于多智能体协作的高级代码生成系统，模拟真实开发团队的协作过程，支持GitHub风格的工作流程和先进的代码修改追踪功能。
+基于AI的智能协作编程系统，模拟真实开发团队的工作流程，提供GitHub风格的协作体验和智能代码生成能力。
 
 ## 🚀 核心特性
 
-### 先进的协作系统
-- **Pull Request工作流**: GitHub风格的代码审核和合并流程
-- **多仓库架构**: 每个智能体拥有独立的工作空间
-- **智能代码审核**: 基于LLM的代码质量评估
-- **自动冲突解决**: 智能合并策略和冲突处理
-- **实时代码修改追踪**: 详细展示智能体的修改内容
+### 🎯 交互式项目配置
+- **通用项目支持**: 支持任何Git仓库 - 本地项目、GitHub仓库或创建新项目
+- **一键GitHub集成**: 自动克隆和配置GitHub仓库
+- **智能项目检测**: 智能识别和处理复杂项目结构
+- **自动初始化**: 自动设置Git仓库和必要文件
+- **路径验证**: 确保所有路径有效且可访问
 
-### 最新改进 ✨
-- **🔍 详细的代码修改摘要**: 用户现在可以清楚看到每个智能体修改了什么
-- **📊 文件差异分析**: 逐行对比变化和影响分析
-- **🤖 AI生成的修改描述**: 智能生成修改内容摘要
-- **⚡ 优化的Issue分配**: 智能Issue分配，避免虚假失败提示
-- **🛠️ 修复的文件写入操作**: 100%准确的可靠代码修改
+### 🤖 高级AI协作
+- **多智能体架构**: 多个AI智能体像真实开发团队一样协作
+- **GitHub风格工作流**: 完整的Pull Request工作流程，包括代码审查和合并
+- **智能代码生成**: 基于项目结构分析的上下文感知代码修改
+- **实时协作**: 智能体自动协调工作并避免冲突
+- **详细变更追踪**: 清楚显示每个智能体的修改内容和全面摘要
 
-### 系统组件
+### 🔧 最新改进 ✨
+- **🌐 GitHub仓库克隆**: 直接支持GitHub URL并自动克隆
+- **🎯 交互式启动体验**: 用户友好的设置过程，提供清晰指导
+- **📁 智能项目检测**: 自动检测和处理特殊项目结构
+- **🔄 增强同步**: 改进仓库间项目内容同步
+- **📊 详细修改报告**: 所有代码变更的全面摘要
+- **⚡ 性能优化**: 更好的资源管理和更快的操作速度
 
-#### 评论员代理 (Commenter Agent)
-- 基于 LLM 的代理，负责确定开发任务
-- 持续监控代码库状态
-- 根据用户需求创建和管理 Issue
-- 审查代码提交和 Pull Request
-- 决定任务完成状态
-
-#### 编码员代理 (Coder Agents)
-- 基于 LLM 的代理，负责实现代码
-- 异步监控和获取任务
-- 智能文件定位，在独立分支中实现代码
-- 创建 Pull Request 进行代码审核
-- 提供详细的修改摘要
-- 处理代码冲突和同步
-
-#### 协作管理器 (Collaboration Manager)
-- 管理整个协作工作流程
-- Pull Request 的创建、审核和合并
-- 分支管理和清理
-- 跨所有智能体的代码同步
-- 冲突解决
-
-## 🔄 协作工作流程
+## 🔄 开发工作流程
 
 ```mermaid
 graph TD
-    A[用户描述需求] --> B[Commenter分析并创建Issue]
-    B --> C[Coder智能抢夺Issue]
-    C --> D[Coder分析项目结构]
-    D --> E[智能文件定位和修改]
-    E --> F[生成详细修改摘要]
-    F --> G[创建包含变更的PR]
-    G --> H[Commenter审核PR]
-    H --> I{审核结果}
-    I -->|通过| J[自动合并到主仓库]
-    I -->|未通过| K[返回反馈意见]
-    J --> L[同步所有智能体]
+    A["🎯 用户提供项目/需求"] --> B["🔍 Commenter分析并创建Issues"]
+    B --> C["⚡ Coder智能体领取任务"]
+    C --> D["📐 项目结构分析"]
+    D --> E["🛠️ 智能代码实现"]
+    E --> F["📋 生成详细变更摘要"]
+    F --> G["📤 创建Pull Request"]
+    G --> H["👀 Commenter审查变更"]
+    H --> I{审查结果}
+    I -->|✅ 通过| J["🔄 自动合并到主分支"]
+    I -->|❌ 拒绝| K["💭 提供反馈"]
+    J --> L["🔄 同步所有智能体"]
     K --> E
 ```
 
-### 多仓库架构
+## ⚡ 快速开始
 
-- **主仓库 (playground)**: 存储最终合并的代码和Issues
-- **智能体仓库**: 每个Coder拥有独立的工作空间
-- **分支管理**: 每个PR在隔离的功能分支中开发
+### 1. 安装
 
-## 📁 项目结构
-
-```
-multi-agent-coder/
-├── run.py                    # 主入口程序，支持交互式设置
-├── src/
-│   └── multi_agent_coder/
-│       ├── __init__.py
-│       ├── config.py         # 配置文件
-│       ├── git_utils.py      # Git操作工具
-│       ├── llm_utils.py      # LLM接口
-│       ├── collaboration.py  # 协作管理器
-│       ├── multi_repo_manager.py  # 多仓库管理
-│       ├── storage.py        # 数据持久化
-│       └── agents/
-│           ├── __init__.py
-│           ├── commenter.py  # 评论员代理
-│           ├── coder.py      # 增强的编码员代理，支持修改追踪
-│           └── thinking/     # 高级智能体能力
-│               ├── memory_manager.py
-│               ├── planner.py
-│               └── reviewer.py
-├── agent_repos/              # 智能体工作目录（自动创建）
-│   ├── playground/           # 主协作仓库
-│   ├── agent_coder_0/        # Coder 0 工作空间
-│   ├── agent_coder_1/        # Coder 1 工作空间
-│   └── agent_coder_2/        # Coder 2 工作空间
-├── .issues.json              # Issues存储文件
-├── README.md
-├── requirements.txt
-├── pyproject.toml
-└── .gitignore
-```
-
-## ⚡ 安装
-
-1. 克隆仓库：
 ```bash
+# 克隆仓库
 git clone https://github.com/charr-Chen/multi-agent-coder.git
 cd multi-agent-coder
-```
 
-2. 安装依赖：
-```bash
-# 使用pip
+# 安装依赖（选择一种）
 pip install -r requirements.txt
-
-# 或使用uv（推荐）
+# 或者（推荐，更快的安装速度）
 uv sync
 ```
 
-3. 设置环境变量：
+### 2. 环境配置
+
 ```bash
-export OPENAI_API_KEY="your-api-key"
-export OPENAI_PROXY_URL="your-proxy-url"  # 可选
+# 必需：设置OpenAI API密钥
+export OPENAI_API_KEY="your-api-key-here"
+
+# 可选：如需要代理
+export OPENAI_PROXY_URL="your-proxy-url"
 ```
 
-## 🚀 使用方法
-
-### 🎯 交互式启动（推荐）
+### 3. 启动系统
 
 ```bash
 python run.py
 ```
 
-系统启动后会**交互式询问**你要使用的Git仓库：
+## 🎯 交互式配置体验
+
+运行系统时，您将看到用户友好的配置过程：
 
 ```
 ============================================================
@@ -495,209 +491,178 @@ python run.py
 ============================================================
 
 💡 请指定你要使用的Git仓库：
-   - 可以是现有项目仓库
-   - 可以是新创建的空仓库
+   - 本地项目路径（如：/path/to/project）
+   - GitHub仓库URL（如：https://github.com/user/repo.git）
    - 留空使用当前目录
 
-📁 Git仓库路径: /path/to/your/project
+📁 Git仓库路径或URL: 
 ```
 
-**特点**：
-- ✅ **自动初始化**：如果不是Git仓库，询问是否初始化
-- ✅ **自动创建Issues文件**：确保 `.issues.json` 文件存在
-- ✅ **路径验证**：确保路径有效且可访问
-- ✅ **用户友好**：清晰的提示和错误处理
+### 📋 支持的输入类型
 
-### ⚙️ 环境变量配置
+| 输入类型 | 示例 | 说明 |
+|----------|------|------|
+| **本地路径** | `/home/user/my-project` | 使用现有本地项目 |
+| **GitHub HTTPS** | `https://github.com/user/repo.git` | 从GitHub克隆 |
+| **GitHub SSH** | `git@github.com:user/repo.git` | 通过SSH克隆 |
+| **空输入** | `(按回车)` | 使用当前目录 |
+
+### 🌟 配置过程详解
+
+1. **🔍 路径验证**: 确保路径/URL有效且可访问
+2. **📥 自动克隆**: 自动克隆GitHub仓库到本地目录
+3. **🔧 Git初始化**: 如果不是Git仓库，提供初始化选项
+4. **📋 Issues配置**: 创建和管理`.issues.json`文件
+5. **🎯 智能检测**: 检测特殊项目结构（如AgentGPT）
+6. **📁 内容同步**: 复制项目内容到协作工作空间
+
+## 🎉 高级功能
+
+### 🌐 GitHub集成
+
+系统与GitHub无缝集成：
 
 ```bash
-export REPO_PATH="/path/to/your/repo"
-export USE_SEPARATE_REPOS="true"  # 推荐多仓库模式
-python run.py
+# 当您提供GitHub URL时，系统会：
+# 1. 验证仓库
+# 2. 克隆到本地目录
+# 3. 设置协作环境
+# 4. 自动处理命名冲突
+
+📁 Git仓库路径或URL: https://github.com/microsoft/vscode.git
+🌐 检测到GitHub仓库: https://github.com/microsoft/vscode.git
+📥 克隆仓库到: vscode
+✅ 成功克隆仓库: /current/path/vscode
 ```
 
-### 📝 配置文件方式
+### 📊 详细变更追踪
 
-创建 `.env` 文件：
-```bash
-OPENAI_API_KEY=your-api-key
-REPO_PATH=/path/to/your/repo
-USE_SEPARATE_REPOS=true
-NUM_CODERS=2
-```
-
-## 🎉 最新版本的新功能
-
-### 📋 详细的代码修改摘要
-
-当Coder Agent完成代码修改后，用户将看到：
+每次代码修改都包含全面信息：
 
 ```
 ================================================================================
 📋 【代码修改摘要】- coder_0
 ================================================================================
-🎯 处理的Issue: 图片上传功能开发
-📝 Issue描述: 实现用户界面和后端接口，支持用户上传图片文件...
-📂 修改的文件: upload_service.py
-📊 文件大小变化:
-   原文件: 120 行
-   修改后: 145 行
-   变化: +25 行
-🔍 代码结构概览:
-   📁 类: 2 个
-      - class UploadService:
-      - class ImageProcessor:
-   ⚙️ 函数: 8 个
-      - def upload_image(self, file):
-      - def validate_image(self, file):
-🎯 与Issue相关的代码行:
-   L23: def upload_image(self, file_data, allowed_types=['jpg', 'png'])...
-   L45: # 图片上传安全检查...
-   ➕ 新增行数: 18
-      + def validate_image_format(self, file_path):
-      + # 支持的图片格式检查
-      + if not self._is_safe_image(file_data):
-      ... 还有 15 行新增内容
-🤖 AI修改摘要:
-   - 新增了图片上传功能模块，支持多种图片格式
-   - 增加了图片格式验证和安全检查机制
-   - 为用户提供了安全可靠的图片上传能力
-📝 Git提交: 'Modify upload_service.py: 图片上传功能开发'
-================================================================================
-✅ 【coder_0 代码修改完成】
+🎯 处理的Issue: 添加用户认证系统
+📝 Issue描述: 实现基于JWT的认证系统，包含登录/登出功能...
+📂 修改的文件: 
+   - src/auth/auth_service.py (+45 行)
+   - src/middleware/auth_middleware.py (+32 行)
+   - tests/test_auth.py (+28 行)
+📊 项目影响:
+   ✅ 新增 3 个文件
+   🔧 修改 0 个现有文件
+   ➕ 总计新增行数: 105
+🔍 代码结构:
+   📁 新增类: 3 个
+      - class AuthService
+      - class AuthMiddleware  
+      - class TestAuth
+   ⚙️ 新增函数: 8 个
+      - def authenticate_user()
+      - def generate_jwt_token()
+      - def validate_token()
+      ...
+🤖 AI摘要:
+   - 实现了完整的JWT认证系统
+   - 添加了安全的令牌生成和验证
+   - 包含了全面的单元测试
+   - 遵循安全最佳实践
+📝 Git提交: 'feat: 添加JWT认证系统'
 ================================================================================
 ```
 
-### 🔧 增强的Issue分配
+## ⚙️ 配置选项
 
-- **智能Issue分配**: 不再出现虚假的"分配失败"信息
-- **并发智能体处理**: 正确处理多个智能体竞争Issue的情况
-- **智能重试逻辑**: 减少不必要的重复尝试
+### 系统配置
 
-### 🛠️ 可靠的文件操作
-
-- **修复的文件写入系统**: 用Python文件操作替换不可靠的shell命令
-- **100%内容准确性**: 文件修改过程中不再出现内容损坏
-- **完善的错误处理**: 更好的错误信息和恢复机制
-
-## ⚙️ 配置
-
-在 `src/multi_agent_coder/config.py` 中配置：
+编辑 `src/multi_agent_coder/config.py`：
 
 ```python
 SYSTEM_CONFIG = {
-    "use_separate_repos": True,          # 启用多仓库模式
-    "num_coders": 3,                     # Coder代理数量
-    "playground_repo": "",               # 主仓库URL（空为本地）
-    "agent_repos_dir": "agent_repos"     # 智能体仓库目录
+    "use_separate_repos": True,      # 多仓库模式（推荐）
+    "num_coders": 3,                 # Coder智能体数量
+    "playground_repo": "",           # 主协作仓库
+    "agent_repos_dir": "agent_repos" # 智能体仓库目录
 }
 ```
 
-## 📊 系统监控
+### 环境变量
 
-### Pull Request状态
-- `open`: 等待审核
-- `approved`: 审核通过
-- `rejected`: 审核未通过
-- `merged`: 已成功合并
+```bash
+# 核心设置
+export OPENAI_API_KEY="your-api-key"
+export OPENAI_PROXY_URL="proxy-url"  # 可选
 
-### Issue状态
-- `open`: 可分配状态
-- `assigned`: 已分配给智能体
-- `review`: 代码审核中
-- `completed`: 任务已完成
-
-## 🛠️ 高级功能
-
-### 智能文件定位
-- **项目结构分析**: 智能体在修改前分析代码库结构
-- **智能文件匹配**: 基于LLM的文件选择，根据Issue需求进行匹配
-- **上下文修改**: 在充分理解项目架构的基础上进行修改
-
-### 实时修改追踪
-- **逐行差异分析**: 精确显示修改内容
-- **影响评估**: 理解修改的影响和意义
-- **AI生成摘要**: 将技术修改转换为易懂的描述
-
-### 增强的分支管理
-- 自动创建功能分支
-- 合并后智能分支清理
-- 冲突检测和解决
-
-### 高级代码同步
-- 智能体仓库间实时同步
-- 自动冲突解决
-- 回滚机制
-
-### 智能代码审核
-- 基于LLM的代码质量评估
-- 详细反馈和建议
-- 高质量代码自动审批
+# 高级设置
+export USE_SEPARATE_REPOS="true"     # 启用多仓库模式
+export NUM_CODERS="3"                # 编码智能体数量
+export REPO_PATH="/path/to/project"  # 覆盖项目路径
+```
 
 ## 🔧 依赖项
 
-- Python 3.9+
-- GitPython: Git操作
-- aiofiles: 异步文件操作
-- openai: LLM接口
-- python-dotenv: 环境变量管理
-- asyncio: 异步编程支持
-- pydantic: 数据验证
-- coloredlogs: 增强日志显示
-
-## 🎯 最佳实践
-
-### Issue创建
-- 清晰的功能需求
-- 具体的实现细节
-- 预期的输出格式
-
-### 代码质量
-- 遵循Python编码标准
-- 添加必要的注释
-- 包含错误处理
-
-### Pull Request管理
-- 一个PR对应一个Issue
-- 清晰的变更描述
-- 及时响应审核反馈
+- **Python 3.9+**: 现代Python特性和性能
+- **GitPython**: Git操作和仓库管理
+- **OpenAI**: AI功能的LLM接口
+- **AsyncIO**: 异步编程，提供更好性能
+- **Pydantic**: 数据验证和设置管理
+- **Coloredlogs**: 彩色增强日志
+- **Aiofiles**: 异步文件操作
 
 ## 🚨 故障排除
 
-1. **环境设置**: 确保OpenAI API密钥正确设置
-2. **网络连接**: LLM调用需要稳定的网络连接
-3. **存储空间**: 多仓库模式会使用更多磁盘空间
-4. **文件权限**: 确保工作目录有写入权限
-5. **Git配置**: 确保Git正确配置了用户信息
+### 常见问题及解决方案
 
-### 常见问题
+#### 🔑 API密钥问题
+```bash
+# 错误："❌ OpenAI API密钥未设置"
+export OPENAI_API_KEY="your-actual-api-key"
+```
 
-#### Issue分配失败
-- **已修复**: 最新版本正确处理并发Issue分配
-- **解决方案**: 无需操作，系统现在智能管理智能体竞争
+#### 🌐 网络连接问题
+```bash
+# 代理环境
+export OPENAI_PROXY_URL="http://proxy-server:port"
+```
 
-#### 文件修改不生效
-- **已修复**: 用可靠的Python文件I/O替换了基于shell的文件操作
-- **解决方案**: 更新到最新版本即可获得100%可靠的文件修改
+#### 📁 权限问题
+```bash
+# 确保写入权限
+chmod -R 755 /path/to/project
+```
 
-#### 缺失修改详情
-- **已修复**: 添加了全面的修改摘要和差异分析
-- **解决方案**: 用户现在可以看到所有代码变更的详细信息
+#### 🔧 Git配置
+```bash
+# 设置Git用户信息
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+```
 
-## 🔮 未来规划
+## 🔮 发展路线
 
-- [ ] 支持复杂的合并策略
-- [ ] 集成代码质量工具（ESLint、Black等）
-- [ ] 远程Git仓库支持
-- [ ] Web界面监控
-- [ ] 自定义审核规则支持
-- [ ] 支持Python以外的多语言
-- [ ] 与CI/CD流水线集成
+### 近期（下个版本）
+- [ ] 🌍 多语言支持（JavaScript、TypeScript、Java）
+- [ ] 🔌 自定义工具插件系统
+- [ ] 📊 监控Web仪表板
+- [ ] 🔄 自动依赖管理
+
+### 中期
+- [ ] ☁️ 云部署选项
+- [ ] 🔗 流行IDE集成
+- [ ] 📈 高级分析和报告
+- [ ] 🤖 自定义AI模型支持
+
+### 长期
+- [ ] 🌐 分布式智能体网络
+- [ ] 🎯 行业特定模板
+- [ ] 🔒 企业安全功能
+- [ ] 📱 监控移动应用
 
 ## 🤝 贡献
 
-欢迎Issues和Pull Requests！请查看我们的贡献指南。
+我们欢迎社区贡献！请查看我们的[贡献指南](CONTRIBUTING.md)了解详情。
 
-## �� 许可证
+## 📄 许可证
 
-MIT License
+本项目采用MIT许可证 - 查看[LICENSE](LICENSE)文件了解详情。

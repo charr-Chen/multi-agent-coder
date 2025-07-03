@@ -45,7 +45,7 @@ class CoderAgent:
         # 记录初始化
         self.memory_manager.store_memory(f"CoderAgent {agent_id} 初始化完成，项目路径: {user_project_path}")
     
-    def _implement_issue(self, issue, max_iterations=30):
+    async def _implement_issue(self, issue, max_iterations=30):
         """实现Issue的核心方法 - 使用简单的prompt驱动"""
         iteration_count = 0
         
@@ -88,8 +88,9 @@ complete
 Your action:
 """
             
-            # 使用LLM生成动作
-            action = self.llm_manager._call_llm(action_prompt).strip()
+            # 使用LLM生成动作（异步调用）
+            action = await self.llm_manager._call_llm(action_prompt)
+            action = action.strip()
             
             if action == "complete":
                 break
@@ -122,7 +123,8 @@ If more work is needed, respond with "no".
 Answer:
 """
             
-            completed = self.llm_manager._call_llm(completion_prompt).strip().lower()
+            completed = await self.llm_manager._call_llm(completion_prompt)
+            completed = completed.strip().lower()
             if completed.startswith("yes"):
                 break
             
@@ -220,8 +222,8 @@ Answer:
             # 格式化issue为字符串
             issue_text = f"Title: {issue.get('title', '')}\nDescription: {issue.get('description', '')}"
             
-            # 调用核心实现方法
-            result = self._implement_issue(issue_text, max_iterations)
+            # 调用核心实现方法（异步）
+            result = await self._implement_issue(issue_text, max_iterations)
             
             # 记录实现结果
             if result["completed"]:

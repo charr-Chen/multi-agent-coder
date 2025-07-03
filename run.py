@@ -46,7 +46,7 @@ logging.basicConfig(
 listener.start()
 
 # 设置特定模块的日志级别，减少噪音
-logging.getLogger('multi_agent_coder.agents.thinking').setLevel(logging.WARNING)
+logging.getLogger('multi_agent_coder.agents.memory_manager').setLevel(logging.WARNING)
 logging.getLogger('multi_agent_coder.agents.tools').setLevel(logging.WARNING)
 logging.getLogger('openai').setLevel(logging.WARNING)
 logging.getLogger('httpx').setLevel(logging.WARNING)
@@ -416,15 +416,13 @@ async def main():
                 agent_git_manager = await multi_repo_manager.setup_agent_repo(agent_id)
                 # 🆕 为每个coder创建独立的LLM管理器，避免并发竞争
                 coder_llm_manager = LLMManager(api_key, proxy_url=proxy_url)
-                coder = CoderAgent(agent_git_manager, coder_llm_manager, agent_id)
+                coder = CoderAgent(f"coder_{i}", coder_llm_manager, user_repo_path)
                 # 设置playground仓库管理器，用于访问Issues
                 coder.set_playground_git_manager(playground_git_manager)
                 # 设置协作管理器，启用Pull Request流程
                 coder.set_collaboration_manager(collaboration_manager)
-                # 注册agent仓库到协作管理器
-                collaboration_manager.register_agent_repo(agent_id, agent_git_manager)
-                # 将多仓库管理器传递给coder，用于同步工作
-                coder.multi_repo_manager = multi_repo_manager
+                # 设置多仓库管理器，用于同步工作
+                coder.set_multi_repo_manager(multi_repo_manager)
                 coders.append(coder)
             
             print(f"🎉 创建了 {len(coders)} 个编码员代理，每个都有独立仓库")
@@ -450,7 +448,7 @@ async def main():
             for i in range(config["system"]["num_coders"]):
                 # 🆕 为每个coder创建独立的LLM管理器，避免并发竞争
                 coder_llm_manager = LLMManager(api_key, proxy_url=proxy_url)
-                coder = CoderAgent(git_manager, coder_llm_manager, f"coder_{i}")
+                coder = CoderAgent(f"coder_{i}", coder_llm_manager, user_repo_path)
                 coders.append(coder)
         
         # 启动所有代理

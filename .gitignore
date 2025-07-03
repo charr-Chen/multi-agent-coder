@@ -62,3 +62,6 @@ agent_repos/*/logs/
 # 忽略代理仓库目录，它们是独立的git仓库
 agent_playground/
 agent_repos/
+
+# Runtime generated data
+/.memory/

@@ -356,18 +356,34 @@ class GitManager:
             except subprocess.CalledProcessError:
                 pass
             
-            # 确保提交信息不为空且正确格式化
-            if not message or message.strip() == "":
-                commit_message = "Auto commit by Multi-Agent Coder"
-            else:
-                commit_message = message.strip()
+            # 规范化提交信息
+            commit_type = "feat"  # 默认类型
+            commit_scope = None
+            commit_description = message
             
-            # 提交 - 修复：确保提交信息正确引用
-            self._run_git_command(['commit', '-m', commit_message])
+            # 尝试从消息中提取类型和范围
+            if ": " in message:
+                type_part, description = message.split(": ", 1)
+                if "(" in type_part and ")" in type_part:
+                    commit_type, scope = type_part.split("(", 1)
+                    commit_scope = scope.rstrip(")")
+                    commit_description = description
+                else:
+                    commit_type = type_part
+                    commit_description = description
+            
+            # 构建规范化的提交信息
+            if commit_scope:
+                formatted_message = f"{commit_type}({commit_scope}): {commit_description}"
+            else:
+                formatted_message = f"{commit_type}: {commit_description}"
+            
+            # 提交
+            self._run_git_command(['commit', '-m', formatted_message])
             
             # 获取提交hash
             commit_hash = self._run_git_command(['rev-parse', 'HEAD'], check_output=True)
-            logger.info(f"提交更改: {commit_message}")
+            logger.info(f"提交更改: {formatted_message}")
             return commit_hash
         
         try:

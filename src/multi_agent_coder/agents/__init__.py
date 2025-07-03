@@ -6,7 +6,7 @@ Agent 模块
 
 from .commenter import CommenterAgent
 from .coder import CoderAgent
-from .thinking import MemoryManager
+from .memory_manager import MemoryManager
 
 __all__ = [
     'CommenterAgent', 

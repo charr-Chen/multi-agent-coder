@@ -303,42 +303,55 @@ class MultiRepoManager:
                 logger.info(f"同步 {len(files_to_sync)} 个文件从 {agent_id} 到 playground")
                 
                 # 复制文件到playground
-                copied_count = 0
+                copied_files = []
                 for file_path in files_to_sync:
-                    if not file_path:
+                    # 跳过特殊文件
+                    if file_path.startswith('.') or file_path.startswith('__'):
                         continue
-                    
+                        
                     src_file = os.path.join(agent_repo_path, file_path)
                     dst_file = os.path.join(playground_git.repo_path, file_path)
                     
-                    if os.path.exists(src_file):
-                        # 确保目标目录存在
-                        dst_dir = os.path.dirname(dst_file)
-                        if dst_dir:
-                            os.makedirs(dst_dir, exist_ok=True)
-                        
-                        # 复制文件
-                        import shutil
-                        shutil.copy2(src_file, dst_file)
-                        copied_count += 1
-                        logger.debug(f"同步文件: {file_path}")
-                
-                if copied_count > 0:
-                    # 提交到playground
-                    commit_message = f"同步 {agent_id} 的工作成果 ({copied_count} 个文件)"
-                    await playground_git.commit_changes(commit_message, files_to_sync)
-                    logger.info(f"✅ 成功同步 {copied_count} 个文件从 {agent_id} 到 playground")
-                    return True
-                else:
-                    logger.warning(f"没有文件被成功同步从 {agent_id}")
-                    return False
+                    if not os.path.exists(src_file):
+                        continue
                     
+                    # 确保目标目录存在
+                    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                    
+                    # 复制文件
+                    try:
+                        shutil.copy2(src_file, dst_file)
+                        copied_files.append(file_path)
+                        logger.debug(f"📄 同步文件: {file_path}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ 同步文件失败 {file_path}: {e}")
+                
+                if copied_files:
+                    # 提交更改到playground
+                    commit_hash = await playground_git.commit_changes(
+                        f"feat(sync): 同步 {agent_id} 的工作",
+                        copied_files
+                    )
+                    
+                    if commit_hash:
+                        logger.info(f"✅ 同步完成，提交: {commit_hash[:8]}")
+                        
+                        # 同步到其他agent
+                        await self.sync_playground_to_agents()
+                        return True
+                    else:
+                        logger.warning("❌ 同步失败：无法提交更改")
+                        return False
+                else:
+                    logger.info("✅ 没有需要同步的文件")
+                    return True
+                
             except Exception as e:
-                logger.error(f"同步文件失败: {e}")
+                logger.error(f"❌ 同步文件失败: {e}")
                 return False
                 
         except Exception as e:
-            logger.error(f"同步agent {agent_id} 工作失败: {e}")
+            logger.error(f"❌ 同步agent工作失败: {e}")
             return False
     
     async def sync_playground_to_agents(self) -> bool:

@@ -174,6 +174,18 @@ class MemoryManager:
         
         return matched_memories[:limit]
     
+    def search_memories(self, query: str, limit: int = 10) -> List[Memory]:
+        """搜索记忆（别名方法，用于向后兼容）
+        
+        Args:
+            query: 查询关键词
+            limit: 返回数量限制
+            
+        Returns:
+            匹配的记忆列表
+        """
+        return self.retrieve_memories(query, limit)
+    
     def _matches_query(self, context: str, query_lower: str) -> bool:
         """检查记忆内容是否匹配查询"""
         context_lower = context.lower()
@@ -197,7 +209,14 @@ class MemoryManager:
             最近的记忆列表
         """
         now = datetime.now(timezone.utc)
-        cutoff_time = now.replace(hour=now.hour - hours) if hours <= 24 else now.replace(day=now.day - hours // 24)
+        
+        # 修复时间计算逻辑
+        if hours <= 24:
+            from datetime import timedelta
+            cutoff_time = now - timedelta(hours=hours)
+        else:
+            from datetime import timedelta
+            cutoff_time = now - timedelta(hours=hours)
         
         recent_memories = [
             memory for memory in self.memories

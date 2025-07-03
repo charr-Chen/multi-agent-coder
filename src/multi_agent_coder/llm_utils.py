@@ -781,11 +781,11 @@ Issue:
         issue = context.get('issue', {})
         recent_thoughts = context.get('recent_thoughts', [])
         
-        # 格式化历史思考链
+        # 格式化历史思考链（使用纯文本格式）
         thoughts_text = ""
         if recent_thoughts:
             thoughts_text = "\n".join([
-                f"- {thought.get('thought', '无记录')}" 
+                f"- {thought.context if hasattr(thought, 'context') else str(thought)}" 
                 for thought in recent_thoughts[-5:]  # 只显示最近5条
             ])
         else:
@@ -806,27 +806,19 @@ Issue:
 3. 编写完整可运行的代码
 4. 遵循最佳实践和代码规范
 
-请严格按如下JSON格式输出：
-{{
-  "thoughts": [
-    {{"thought": "你每一步的思考内容", "context": {{"step": "分析需求"}}, "conclusion": "本步结论", "confidence": 0.9}},
-    {{"thought": "设计实现方案", "context": {{"step": "方案设计"}}, "conclusion": "选择的技术方案", "confidence": 0.8}},
-    {{"thought": "编写代码实现", "context": {{"step": "代码实现"}}, "conclusion": "代码实现完成", "confidence": 0.9}}
-  ],
-  "result": {{
-    "file_path": "要写入的文件路径（相对项目根目录）",
-    "code": "完整的可运行代码内容"
-  }}
-}}
+请用自然语言描述你的思考过程，然后直接提供代码实现。
 
-如果需要修改多个文件，可以返回数组形式：
-{{
-  "thoughts": [...],
-  "result": [
-    {{"file_path": "src/components/MultiModal.tsx", "code": "React组件代码..."}},
-    {{"file_path": "src/utils/parser.py", "code": "Python解析器代码..."}}
-  ]
-}}
+格式如下：
+**思考过程：**
+[描述你的分析过程、设计方案等]
+
+**代码实现：**
+文件路径：[相对项目根目录的路径]
+```
+[完整的可运行代码内容]
+```
+
+如果需要修改多个文件，请分别提供每个文件的路径和代码。
 
 注意：
 - 代码必须是完整的、可运行的
@@ -838,13 +830,16 @@ Issue:
     def _process_response(self, task_type: str, response: str, context: Dict[str, Any]) -> Any:
         """处理LLM响应"""
         try:
-            # 尝试解析JSON响应
-            if task_type in ["analyze_requirements", "analyze_code", "review_code", 
+            # implement_issue现在返回自然语言格式，不需要JSON解析
+            if task_type == "implement_issue":
+                return self._parse_natural_language_response(response)
+            # 其他任务类型仍然尝试解析JSON响应
+            elif task_type in ["analyze_requirements", "analyze_code", "review_code", 
                            "plan_implementation", "select_files", "generate_filename",
                            "analyze_project", "debug_code", "optimize_code", 
                            "create_tests", "document_code", "refactor_code",
                            "security_audit", "performance_analysis", "architecture_design",
-                           "api_design", "database_design", "deployment_plan", "implement_issue"]:
+                           "api_design", "database_design", "deployment_plan"]:
                 return self._parse_json_response(response)
             else:
                 return response
@@ -866,6 +861,81 @@ Issue:
         except json.JSONDecodeError:
             logger.warning("JSON解析失败，返回原始响应")
             return {"raw_response": response}
+    
+    def _parse_natural_language_response(self, response: str) -> Dict[str, Any]:
+        """解析自然语言格式的响应"""
+        try:
+            # 提取思考过程
+            thoughts_match = re.search(r'\*\*思考过程：\*\*\s*(.*?)(?=\*\*代码实现：\*\*)', response, re.DOTALL)
+            thoughts_text = thoughts_match.group(1).strip() if thoughts_match else "无思考过程记录"
+            
+            # 提取代码实现
+            code_sections = []
+            
+            # 匹配文件路径和代码块
+            file_pattern = r'文件路径：\s*(.*?)\s*```(?:\w+)?\s*(.*?)```'
+            matches = re.finditer(file_pattern, response, re.DOTALL)
+            
+            for match in matches:
+                file_path = match.group(1).strip()
+                code_content = match.group(2).strip()
+                code_sections.append({
+                    "file_path": file_path,
+                    "code": code_content
+                })
+            
+            # 如果没有找到标准格式，尝试其他格式
+            if not code_sections:
+                # 尝试找到代码块
+                code_blocks = re.findall(r'```(?:\w+)?\s*(.*?)```', response, re.DOTALL)
+                if code_blocks:
+                    # 假设第一个代码块是主要实现
+                    code_sections.append({
+                        "file_path": "main.py",  # 默认文件名
+                        "code": code_blocks[0].strip()
+                    })
+            
+            # 构建结果
+            result = {
+                "thoughts": [
+                    {
+                        "thought": thoughts_text,
+                        "context": {"step": "自然语言分析"},
+                        "conclusion": "完成分析和实现",
+                        "confidence": 0.8
+                    }
+                ]
+            }
+            
+            # 根据代码数量决定result格式
+            if len(code_sections) == 1:
+                result["result"] = code_sections[0]
+            elif len(code_sections) > 1:
+                result["result"] = code_sections
+            else:
+                result["result"] = {
+                    "file_path": "fallback.md",
+                    "code": f"# 实现说明\n\n{thoughts_text}\n\n{response}"
+                }
+            
+            return result
+            
+        except Exception as e:
+            logger.warning(f"解析自然语言响应失败: {e}")
+            return {
+                "thoughts": [
+                    {
+                        "thought": "解析响应失败",
+                        "context": {"step": "错误处理"},
+                        "conclusion": "需要人工检查",
+                        "confidence": 0.1
+                    }
+                ],
+                "result": {
+                    "file_path": "raw_response.md",
+                    "code": f"# 原始响应\n\n{response}"
+                }
+            }
     
     def _get_fallback_result(self, task_type: str, context: Dict[str, Any]) -> Any:
         """获取fallback结果"""

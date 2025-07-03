@@ -5,10 +5,7 @@ memory只存储AI在写代码过程中的思考和决策链。
 """
 
 import os
-import json
 import logging
-import asyncio
-import time
 from typing import Any, Optional
 from ..git_utils import GitManager
 from ..llm_utils import LLMManager

@@ -1,9 +1,8 @@
 """
 记忆管理器
-负责存储和检索代理的历史经验，使用自然语言处理，简单高效
+负责存储和检索代理的历史经验，使用自然语言处理，以纯文本格式存储
 """
 
-import json
 import os
 import time
 from pathlib import Path
@@ -21,29 +20,35 @@ class Memory:
     create_at: datetime
     context: str
     
-    def to_dict(self) -> dict[str, Any]:
-        """转换为字典格式"""
-        return {
-            "create_at": self.create_at.isoformat(),
-            "context": self.context
-        }
+    def to_text_line(self) -> str:
+        """转换为文本行格式"""
+        timestamp = self.create_at.strftime('%Y-%m-%d %H:%M:%S')
+        return f"[{timestamp}] {self.context}"
     
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> 'Memory':
-        """从字典创建实例"""
-        return cls(
-            create_at=datetime.fromisoformat(data["create_at"]),
-            context=data["context"]
-        )
+    def from_text_line(cls, line: str) -> Optional['Memory']:
+        """从文本行创建实例"""
+        # 匹配格式: [2025-07-03 10:41:52] 记忆内容
+        match = re.match(r'\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (.+)', line.strip())
+        if match:
+            try:
+                timestamp_str = match.group(1)
+                context = match.group(2)
+                create_at = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+                return cls(create_at=create_at, context=context)
+            except ValueError:
+                logger.warning(f"无法解析时间戳: {line}")
+                return None
+        return None
 
 class MemoryManager:
-    """简化的记忆管理器"""
+    """简化的记忆管理器 - 纯文本格式"""
     
     def __init__(self, agent_id: str, memory_dir: str = ".memory"):
         self.agent_id = agent_id
         self.memory_dir = Path(memory_dir)
         self.memory_dir.mkdir(exist_ok=True)
-        self.memory_file = self.memory_dir / f"{agent_id}_memory.json"
+        self.memory_file = self.memory_dir / f"{agent_id}_memory.txt"
         self.memories: List[Memory] = []
         self.max_memories = 500  # 最大记忆数量
         self.max_memory_age_days = 30  # 记忆最大保存天数
@@ -54,31 +59,47 @@ class MemoryManager:
         logger.info(f"记忆管理器初始化完成: {agent_id}, 已加载 {len(self.memories)} 条记忆")
     
     def _load_memories(self):
-        """加载记忆文件"""
+        """从纯文本文件加载记忆"""
         if self.memory_file.exists():
             try:
                 with open(self.memory_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    for memory_data in data.get('memories', []):
-                        memory = Memory.from_dict(memory_data)
-                        # 检查记忆是否过期
-                        if not self._is_memory_expired(memory):
+                    content = f.read()
+                
+                # 解析文本内容
+                lines = content.split('\n')
+                memories_loaded = 0
+                
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith('[') and ']' in line:
+                        memory = Memory.from_text_line(line)
+                        if memory and not self._is_memory_expired(memory):
                             self.memories.append(memory)
-                logger.info(f"成功加载 {len(self.memories)} 条记忆")
+                            memories_loaded += 1
+                
+                logger.info(f"成功加载 {memories_loaded} 条记忆")
             except Exception as e:
                 logger.error(f"加载记忆文件失败: {e}")
     
     def _save_memories(self):
-        """保存记忆到文件"""
+        """保存记忆到纯文本文件"""
         try:
-            data = {
-                'agent_id': self.agent_id,
-                'timestamp': datetime.now(timezone.utc).isoformat(),
-                'memories': [memory.to_dict() for memory in self.memories]
-            }
             with open(self.memory_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            logger.debug(f"成功保存 {len(self.memories)} 条记忆")
+                # 写入文件头
+                f.write(f"=== Agent: {self.agent_id} ===\n")
+                f.write(f"Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"Total Memories: {len(self.memories)}\n")
+                f.write("\n")
+                
+                # 按时间排序并写入记忆
+                sorted_memories = sorted(self.memories, key=lambda m: m.create_at, reverse=True)
+                for memory in sorted_memories:
+                    f.write(memory.to_text_line() + "\n")
+                
+                # 写入文件尾
+                f.write("\n---\n")
+            
+            logger.debug(f"成功保存 {len(self.memories)} 条记忆到纯文本文件")
         except Exception as e:
             logger.error(f"保存记忆文件失败: {e}")
     
@@ -220,15 +241,15 @@ class MemoryManager:
         
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(f"Agent: {self.agent_id}\n")
+                f.write(f"=== Agent: {self.agent_id} Memory Export ===\n")
                 f.write(f"Export Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"Total Memories: {len(self.memories)}\n")
                 f.write("="*50 + "\n\n")
                 
-                for i, memory in enumerate(sorted(self.memories, key=lambda m: m.create_at), 1):
+                sorted_memories = sorted(self.memories, key=lambda m: m.create_at, reverse=True)
+                for i, memory in enumerate(sorted_memories, 1):
                     f.write(f"Memory #{i}\n")
-                    f.write(f"Created: {memory.create_at.strftime('%Y-%m-%d %H:%M:%S')}\n")
-                    f.write(f"Context: {memory.context}\n")
+                    f.write(memory.to_text_line() + "\n")
                     f.write("-"*30 + "\n\n")
             
             logger.info(f"记忆导出成功: {file_path}")
@@ -236,6 +257,17 @@ class MemoryManager:
         except Exception as e:
             logger.error(f"导出记忆失败: {e}")
             raise
+    
+    def view_memory_file(self) -> str:
+        """查看记忆文件内容（用于调试）"""
+        if self.memory_file.exists():
+            try:
+                with open(self.memory_file, 'r', encoding='utf-8') as f:
+                    return f.read()
+            except Exception as e:
+                logger.error(f"读取记忆文件失败: {e}")
+                return f"读取失败: {e}"
+        return "记忆文件不存在"
     
     # 便捷方法：存储不同类型的记忆（使用自然语言描述）
     def store_file_change(self, file_path: str, action: str, details: str = None):

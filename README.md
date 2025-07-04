@@ -22,6 +22,7 @@ A sophisticated AI-powered collaborative coding system that simulates real devel
 - **Intelligent Code Generation**: Context-aware code modifications with project structure analysis
 - **Real-time Collaboration**: Agents coordinate work and avoid conflicts automatically
 - **Detailed Change Tracking**: See exactly what each agent modified with comprehensive summaries
+- **Async Programming Support**: Enhanced performance with asynchronous agent operations
 
 ### 🔧 Latest Improvements ✨
 - **🌐 GitHub Repository Cloning**: Direct support for GitHub URLs with automatic cloning
@@ -30,6 +31,8 @@ A sophisticated AI-powered collaborative coding system that simulates real devel
 - **🔄 Enhanced Synchronization**: Improved project content synchronization between repositories
 - **📊 Detailed Modification Reports**: Comprehensive summaries of all code changes
 - **⚡ Optimized Performance**: Better resource management and faster operations
+- **🧠 Improved Memory Management**: Enhanced natural language memory processing
+- **🔄 Async Agent Operations**: Better concurrency and performance
 
 ### System Components
 
@@ -44,6 +47,7 @@ A sophisticated AI-powered collaborative coding system that simulates real devel
 - **Context-Aware Coding**: Understands project structure before making changes
 - **Independent Workspaces**: Each agent has its own repository for conflict-free development
 - **Quality Assurance**: Provides detailed modification summaries and change tracking
+- **Async Operations**: Enhanced performance with asynchronous programming support
 
 #### 🔗 Collaboration Manager
 - **Workflow Orchestration**: Manages the complete development workflow
@@ -84,17 +88,16 @@ multi-agent-coder/
 │       └── agents/
 │           ├── commenter.py  # 🗣️ Commenter agent
 │           ├── coder.py      # 👨‍💻 Enhanced Coder agent
-│           └── thinking/     # 🧠 Advanced AI capabilities
-│               └── memory_manager.py
+│           └── memory_manager.py  # 🧠 Memory management
 ├── agent_repos/              # 🏢 Auto-created agent workspaces
 │   ├── playground/           # 🎮 Main collaboration repository
 │   ├── agent_coder_0/        # 👨‍💻 Coder 0 workspace
 │   ├── agent_coder_1/        # 👨‍💻 Coder 1 workspace
 │   └── agent_coder_2/        # 👨‍💻 Coder 2 workspace
-├── .issues.json              # 📋 Issues tracking
+├── agent_repos/playground/.issues.json  # 📋 Issues tracking
 ├── README.md
-├── requirements.txt
-└── pyproject.toml
+├── pyproject.toml           # 📦 Modern Python project configuration
+└── uv.lock                  # 🔒 Dependency lock file
 ```
 
 ## ⚡ Quick Start
@@ -106,10 +109,11 @@ multi-agent-coder/
 git clone https://github.com/charr-Chen/multi-agent-coder.git
 cd multi-agent-coder
 
-# Install dependencies (choose one)
-pip install -r requirements.txt
-# OR (recommended for faster installation)
+# Install dependencies using uv (recommended)
 uv sync
+
+# Alternative: Install using pip (if uv is not available)
+pip install -e .
 ```
 
 ### 2. Environment Setup
@@ -120,6 +124,11 @@ export OPENAI_API_KEY="your-api-key-here"
 
 # Optional: Set proxy if needed
 export OPENAI_PROXY_URL="your-proxy-url"
+
+# Optional: Configure additional settings
+export OPENAI_MODEL="gpt-4"           # Default model
+export OPENAI_TEMPERATURE="0.7"       # Creativity level
+export OPENAI_MAX_TOKENS="1000"       # Response length
 ```
 
 ### 3. Launch the System
@@ -250,10 +259,18 @@ SYSTEM_CONFIG = {
 export OPENAI_API_KEY="your-api-key"
 export OPENAI_PROXY_URL="proxy-url"  # Optional
 
+# Model configuration
+export OPENAI_MODEL="gpt-4"          # AI model to use
+export OPENAI_TEMPERATURE="0.7"      # Creativity level (0.0-1.0)
+export OPENAI_MAX_TOKENS="1000"      # Maximum response length
+
 # Advanced settings
 export USE_SEPARATE_REPOS="true"     # Enable multi-repo mode
 export NUM_CODERS="3"                # Number of coding agents
 export REPO_PATH="/path/to/project"  # Override project path
+export CHECK_INTERVAL="60"           # Issue check interval (seconds)
+export REVIEW_INTERVAL="30"          # Review check interval (seconds)
+export WORK_INTERVAL="10"            # Work check interval (seconds)
 ```
 
 ## 📊 Monitoring & Status
@@ -289,16 +306,45 @@ export REPO_PATH="/path/to/project"  # Override project path
 - **Resource Management**: Efficient use of API calls and system resources
 - **Caching**: Intelligent caching of project analysis and context
 - **Background Tasks**: Non-blocking operations for better responsiveness
+- **Async Operations**: Enhanced concurrency with async programming
 
 ## 🔧 Dependencies
 
-- **Python 3.9+**: Modern Python features and performance
+### 📦 Package Management
+
+This project uses the modern `uv` package manager for dependency management, which is currently the fastest Python package manager.
+
+**Dependency Files:**
+- `pyproject.toml` - Project configuration and dependency definitions
+- `uv.lock` - Lock file ensuring dependency version consistency
+
+**Installation Commands:**
+```bash
+# Install all dependencies
+uv sync
+
+# Add new dependency
+uv add package_name
+
+# Add development dependency
+uv add --dev package_name
+
+# Run project
+uv run python run.py
+```
+
+### 📋 Core Dependencies
+
+- **Python 3.13+**: Modern Python features and performance
 - **GitPython**: Git operations and repository management
 - **OpenAI**: LLM interface for AI capabilities
 - **AsyncIO**: Asynchronous programming for better performance
 - **Pydantic**: Data validation and settings management
 - **Coloredlogs**: Enhanced logging with colors
 - **Aiofiles**: Asynchronous file operations
+- **Aioconsole**: Interactive console support
+- **Pygame**: Optional multimedia support
+- **Python-dotenv**: Environment variable management
 
 ## 🎯 Best Practices
 
@@ -349,12 +395,20 @@ git config --global user.name "Your Name"
 git config --global user.email "your.email@example.com"
 ```
 
+#### 🐍 Python Version
+```bash
+# Ensure Python 3.13+ is installed
+python --version
+# Should show Python 3.13.x or higher
+```
+
 ### Performance Tips
 
 1. **🚀 Use Multi-Repo Mode**: Better performance and conflict avoidance
 2. **⚡ Optimize API Usage**: Monitor and optimize API call frequency
 3. **💾 Manage Disk Space**: Multi-repo mode uses more disk space
 4. **🔄 Regular Cleanup**: Periodically clean up old branches and repositories
+5. **🧠 Memory Management**: The system now uses improved natural language memory processing
 
 ## 🔮 Roadmap
 
@@ -386,15 +440,14 @@ We welcome contributions from the community! Please see our [Contributing Guidel
 # Fork and clone the repository
 git clone https://github.com/your-username/multi-agent-coder.git
 
-# Create a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install development dependencies
-pip install -r requirements-dev.txt
+# Install dependencies using uv
+uv sync
 
 # Run tests
-python -m pytest
+uv run pytest
+
+# Run the application
+uv run python run.py
 ```
 
 ## 📄 License
@@ -423,6 +476,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **智能代码生成**: 基于项目结构分析的上下文感知代码修改
 - **实时协作**: 智能体自动协调工作并避免冲突
 - **详细变更追踪**: 清楚显示每个智能体的修改内容和全面摘要
+- **异步编程支持**: 增强的异步智能体操作性能
 
 ### 🔧 最新改进 ✨
 - **🌐 GitHub仓库克隆**: 直接支持GitHub URL并自动克隆
@@ -431,6 +485,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **🔄 增强同步**: 改进仓库间项目内容同步
 - **📊 详细修改报告**: 所有代码变更的全面摘要
 - **⚡ 性能优化**: 更好的资源管理和更快的操作速度
+- **🧠 改进内存管理**: 增强的自然语言内存处理
+- **🔄 异步智能体操作**: 更好的并发性和性能
 
 ## 🔄 开发工作流程
 
@@ -465,17 +521,16 @@ multi-agent-coder/
 │       └── agents/
 │           ├── commenter.py  # 🗣️ 评论员智能体
 │           ├── coder.py      # 👨‍💻 增强编码员智能体
-│           └── thinking/     # 🧠 高级AI能力
-│               └── memory_manager.py
+│           └── memory_manager.py  # 🧠 内存管理
 ├── agent_repos/              # 🏢 自动创建的智能体工作空间
 │   ├── playground/           # 🎮 主协作仓库
 │   ├── agent_coder_0/        # 👨‍💻 Coder 0 工作空间
 │   ├── agent_coder_1/        # 👨‍💻 Coder 1 工作空间
 │   └── agent_coder_2/        # 👨‍💻 Coder 2 工作空间
-├── .issues.json              # 📋 Issues跟踪文件
+├── agent_repos/playground/.issues.json  # 📋 Issues跟踪文件
 ├── README.md
-├── requirements.txt
-└── pyproject.toml
+├── pyproject.toml           # 📦 现代Python项目配置
+└── uv.lock                  # 🔒 依赖锁定文件
 ```
 
 ## ⚡ 快速开始
@@ -487,10 +542,11 @@ multi-agent-coder/
 git clone https://github.com/charr-Chen/multi-agent-coder.git
 cd multi-agent-coder
 
-# 安装依赖（选择一种）
-pip install -r requirements.txt
-# 或者（推荐，更快的安装速度）
+# 使用uv安装依赖（推荐）
 uv sync
+
+# 替代方案：使用pip安装（如果uv不可用）
+pip install -e .
 ```
 
 ### 2. 环境配置
@@ -501,6 +557,11 @@ export OPENAI_API_KEY="your-api-key-here"
 
 # 可选：如需要代理
 export OPENAI_PROXY_URL="your-proxy-url"
+
+# 可选：配置其他设置
+export OPENAI_MODEL="gpt-4"           # 默认模型
+export OPENAI_TEMPERATURE="0.7"       # 创造性水平
+export OPENAI_MAX_TOKENS="1000"       # 响应长度
 ```
 
 ### 3. 启动系统
@@ -622,21 +683,57 @@ SYSTEM_CONFIG = {
 export OPENAI_API_KEY="your-api-key"
 export OPENAI_PROXY_URL="proxy-url"  # 可选
 
+# 模型配置
+export OPENAI_MODEL="gpt-4"          # 使用的AI模型
+export OPENAI_TEMPERATURE="0.7"      # 创造性水平 (0.0-1.0)
+export OPENAI_MAX_TOKENS="1000"      # 最大响应长度
+
 # 高级设置
 export USE_SEPARATE_REPOS="true"     # 启用多仓库模式
 export NUM_CODERS="3"                # 编码智能体数量
 export REPO_PATH="/path/to/project"  # 覆盖项目路径
+export CHECK_INTERVAL="60"           # Issue检查间隔（秒）
+export REVIEW_INTERVAL="30"          # 审查检查间隔（秒）
+export WORK_INTERVAL="10"            # 工作检查间隔（秒）
 ```
 
 ## 🔧 依赖项
 
-- **Python 3.9+**: 现代Python特性和性能
+### 📦 包管理
+
+本项目使用现代化的 `uv` 包管理器进行依赖管理，这是目前最快的Python包管理器。
+
+**依赖文件：**
+- `pyproject.toml` - 项目配置和依赖定义
+- `uv.lock` - 锁定文件，确保依赖版本一致性
+
+**安装命令：**
+```bash
+# 安装所有依赖
+uv sync
+
+# 添加新依赖
+uv add package_name
+
+# 添加开发依赖
+uv add --dev package_name
+
+# 运行项目
+uv run python run.py
+```
+
+### 📋 核心依赖
+
+- **Python 3.13+**: 现代Python特性和性能
 - **GitPython**: Git操作和仓库管理
 - **OpenAI**: AI功能的LLM接口
 - **AsyncIO**: 异步编程，提供更好性能
 - **Pydantic**: 数据验证和设置管理
 - **Coloredlogs**: 彩色增强日志
 - **Aiofiles**: 异步文件操作
+- **Aioconsole**: 交互式控制台支持
+- **Pygame**: 可选多媒体支持
+- **Python-dotenv**: 环境变量管理
 
 ## 🚨 故障排除
 
@@ -667,6 +764,13 @@ git config --global user.name "Your Name"
 git config --global user.email "your.email@example.com"
 ```
 
+#### 🐍 Python版本
+```bash
+# 确保安装Python 3.13+
+python --version
+# 应显示Python 3.13.x或更高版本
+```
+
 ## 🔮 发展路线
 
 ### 近期（下个版本）
@@ -690,6 +794,22 @@ git config --global user.email "your.email@example.com"
 ## 🤝 贡献
 
 我们欢迎社区贡献！请查看我们的[贡献指南](CONTRIBUTING.md)了解详情。
+
+### 开发设置
+
+```bash
+# Fork并克隆仓库
+git clone https://github.com/your-username/multi-agent-coder.git
+
+# 使用uv安装依赖
+uv sync
+
+# 运行测试
+uv run pytest
+
+# 运行应用程序
+uv run python run.py
+```
 
 ## 📄 许可证
 

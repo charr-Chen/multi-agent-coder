@@ -135,10 +135,10 @@ Created: {created}
         logger.info(f"🤖 开始LLM代码审查...")
         review_result = await self.llm_manager.review_code(issue, code_changes["code"])
         
-        logger.info(f"📊 审查结果: {'通过' if review_result['approved'] else '未通过'}")
+        logger.info(f"📊 审查结果: {'通过' if review_result.get('approved', False) else '未通过'}")
         logger.info(f"💬 审查评论: {review_result.get('comments', 'No comments')}")
         
-        if review_result["approved"]:
+        if review_result.get("approved", False):
             # 更新 Issue 状态
             logger.info(f"✅ 更新Issue状态为completed...")
             await self.git_manager.update_issue_status(
@@ -158,7 +158,7 @@ Created: {created}
             logger.info(f"🔄 Issue {issue_id} 未通过审查，需要重新实现")
             logger.info(f"📝 审查意见: {review_result['comments']}")
         
-        return review_result["approved"]
+        return review_result.get("approved", False)
     
     async def monitor_repo(self) -> None:
         """监控代码库状态
@@ -385,6 +385,39 @@ Created: {created}
                 logger.error(f"❌ 审查 Issue 时出错: {e}")
                 await asyncio.sleep(30)
     
+    async def sync_playground_code(self) -> None:
+        """同步playground代码到所有agent仓库"""
+        logger.info("🔄 开始代码同步任务...")
+        while True:
+            try:
+                logger.debug("📡 检查playground更新...")
+                
+                # 检查playground是否有新提交
+                try:
+                    if self.git_manager.repo.remotes:
+                        await self.git_manager.pull_changes()
+                        logger.debug("✅ 已拉取playground最新更新")
+                    else:
+                        logger.debug("💻 本地仓库模式，跳过拉取")
+                except Exception as e:
+                    logger.debug(f"⚠️ 拉取playground更新失败: {e}")
+                
+                # 如果有协作管理器，同步到所有agent
+                if self.collaboration_manager:
+                    try:
+                        await self.collaboration_manager.sync_all_agents()
+                        logger.info("✅ 成功同步playground代码到所有agent")
+                    except Exception as e:
+                        logger.error(f"❌ 同步代码到agent失败: {e}")
+                
+                # 休眠一段时间再检查
+                logger.debug("😴 代码同步休眠60秒...")
+                await asyncio.sleep(60)
+                
+            except Exception as e:
+                logger.error(f"❌ 代码同步任务出错: {e}")
+                await asyncio.sleep(60)
+    
     async def run(self) -> None:
         """运行评论员代理
         
@@ -406,6 +439,12 @@ Created: {created}
             pr_review_task = asyncio.create_task(self.review_pull_requests())
             tasks.append(pr_review_task)
             logger.info("✅ 启用Pull Request审查功能")
+            
+            # 添加代码同步任务
+            logger.info("🔄 创建代码同步任务...")
+            sync_task = asyncio.create_task(self.sync_playground_code())
+            tasks.append(sync_task)
+            logger.info("✅ 启用代码同步功能")
         else:
             logger.info("⚠️ 未启用Pull Request审查功能")
         

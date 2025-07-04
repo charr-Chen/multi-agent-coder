@@ -176,37 +176,23 @@ def get_user_repo():
             print(f"✅ 选择Git仓库: {repo_path}")
             print()
             
-            # 检查Issues文件
+            # 检查用户项目是否包含Issues文件（仅作参考，实际使用playground的Issues）
             issues_file = os.path.join(repo_path, '.issues.json')
-            if not os.path.exists(issues_file):
-                print("📝 创建Issues管理文件...")
-                with open(issues_file, 'w', encoding='utf-8') as f:
-                    f.write('{"issues": []}\n')
-                print("✅ 已创建 .issues.json 文件")
-            else:
-                # 检查Issues文件内容，确保不包含预设Issues
+            if os.path.exists(issues_file):
                 try:
                     import json
                     with open(issues_file, 'r', encoding='utf-8') as f:
                         issues_data = json.load(f)
                     
                     if issues_data.get('issues') and len(issues_data['issues']) > 0:
-                        print(f"⚠️  发现 {len(issues_data['issues'])} 个现有Issues")
-                        clear_choice = input("🤔 是否清空现有Issues？(y/n): ").strip().lower()
-                        if clear_choice in ['y', 'yes', '是']:
-                            with open(issues_file, 'w', encoding='utf-8') as f:
-                                f.write('{"issues": []}\n')
-                            print("✅ 已清空Issues文件")
-                        else:
-                            print("📋 保留现有Issues")
+                        print(f"📋 发现用户项目中有 {len(issues_data['issues'])} 个Issues")
+                        print("💡 注意：系统将使用独立的playground仓库管理Issues")
                     else:
-                        print("✅ Issues文件已存在且为空")
+                        print("✅ 用户项目Issues文件为空")
                 except Exception as e:
-                    print(f"⚠️  检查Issues文件时出错: {e}")
-                    print("📝 重新创建Issues文件...")
-                    with open(issues_file, 'w', encoding='utf-8') as f:
-                        f.write('{"issues": []}\n')
-                    print("✅ 已重新创建 .issues.json 文件")
+                    print(f"⚠️  检查用户项目Issues文件时出错: {e}")
+            else:
+                print("📝 用户项目中没有Issues文件，系统将创建独立的Issues管理")
             
             return repo_path
             
@@ -370,32 +356,30 @@ async def main():
                 logger.error(f"❌ 复制用户项目内容失败: {e}")
                 logger.warning("⚠️ Agent将在没有参考代码的情况下工作")
             
-            # 🆕 关键步骤：同步主项目的Issues到playground仓库
-            logger.info("🔄 同步主项目Issues到playground仓库...")
+            # 🆕 关键步骤：确保playground仓库有Issues文件
+            logger.info("🔄 设置playground仓库的Issues文件...")
             try:
-                # 读取主项目的Issues
-                main_issues_file = os.path.join(user_repo_path, ".issues.json")
-                if os.path.exists(main_issues_file):
+                # 检查playground仓库是否已有Issues文件
+                playground_issues_file = os.path.join(playground_git_manager.repo_path, ".issues.json")
+                
+                if not os.path.exists(playground_issues_file):
+                    # 创建空的Issues文件
                     import json
-                    with open(main_issues_file, 'r', encoding='utf-8') as f:
-                        main_issues_data = json.load(f)
-                    
-                    # 写入到playground仓库
-                    playground_issues_file = os.path.join(playground_git_manager.repo_path, ".issues.json")
                     with open(playground_issues_file, 'w', encoding='utf-8') as f:
-                        json.dump(main_issues_data, f, indent=2, ensure_ascii=False)
+                        json.dump({"issues": []}, f, indent=2, ensure_ascii=False)
                     
                     # 提交到playground仓库
                     await playground_git_manager.commit_changes(
-                        "同步主项目Issues到playground",
+                        "初始化Issues文件",
                         [".issues.json"]
                     )
                     
-                    logger.info(f"✅ 成功同步 {len(main_issues_data.get('issues', []))} 个Issues到playground仓库")
+                    logger.info("✅ 在playground仓库创建了Issues文件")
                 else:
-                    logger.warning("❌ 主项目的.issues.json文件不存在")
+                    logger.info("✅ playground仓库已有Issues文件")
+                    
             except Exception as e:
-                logger.error(f"❌ 同步Issues到playground失败: {e}")
+                logger.error(f"❌ 设置playground仓库Issues文件失败: {e}")
             
             # 🆕 创建协作管理器（使用playground仓库作为主仓库，使用独立的LLM管理器）
             collaboration_llm_manager = LLMManager(api_key, proxy_url=proxy_url)
@@ -414,9 +398,11 @@ async def main():
                 agent_id = f"coder_{i}"
                 # 为每个coder设置独立仓库
                 agent_git_manager = await multi_repo_manager.setup_agent_repo(agent_id)
+                # 🆕 使用agent的独立工作目录，而不是用户原始项目路径
+                agent_work_path = agent_git_manager.repo_path
                 # 🆕 为每个coder创建独立的LLM管理器，避免并发竞争
                 coder_llm_manager = LLMManager(api_key, proxy_url=proxy_url)
-                coder = CoderAgent(f"coder_{i}", coder_llm_manager, user_repo_path)
+                coder = CoderAgent(f"coder_{i}", coder_llm_manager, agent_work_path)
                 # 设置playground仓库管理器，用于访问Issues
                 coder.set_playground_git_manager(playground_git_manager)
                 # 设置协作管理器，启用Pull Request流程
@@ -448,6 +434,7 @@ async def main():
             for i in range(config["system"]["num_coders"]):
                 # 🆕 为每个coder创建独立的LLM管理器，避免并发竞争
                 coder_llm_manager = LLMManager(api_key, proxy_url=proxy_url)
+                # 🆕 在单仓库模式下，使用用户指定的仓库路径
                 coder = CoderAgent(f"coder_{i}", coder_llm_manager, user_repo_path)
                 coders.append(coder)
         

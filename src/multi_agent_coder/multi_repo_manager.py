@@ -260,7 +260,7 @@ class MultiRepoManager:
             是否同步成功
         """
         try:
-            agent_repo_path = os.path.join(self.agent_repos_dir, agent_id)
+            agent_repo_path = os.path.join(self.agent_repos_dir, f"agent_{agent_id}")
             if not os.path.exists(agent_repo_path):
                 logger.warning(f"Agent仓库不存在: {agent_repo_path}")
                 return False
@@ -379,6 +379,9 @@ class MultiRepoManager:
             
             # 同步到所有agent仓库
             for agent_id, git_manager in self.agent_git_managers.items():
+                
+                # 获取agent仓库路径
+                agent_repo_path = os.path.join(self.agent_repos_dir, f"agent_{agent_id}")
                 
                 # 复制playground的更新到agent仓库
                 # 这里可以实现更智能的合并策略，避免覆盖agent的工作

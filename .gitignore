@@ -43,7 +43,6 @@ ENV/
 .env.*
 
 # Project specific
-tasks.json  # 任务数据文件
 .issues.json  # Issue跟踪文件
 
 # Test coverage

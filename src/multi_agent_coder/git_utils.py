@@ -315,6 +315,15 @@ class GitManager:
             if success:
                 # 提交更改
                 def _commit_update():
+                    # 检查是否有更改需要提交
+                    try:
+                        status_output = self._run_git_command(['status', '--porcelain'], check_output=True)
+                        if not status_output.strip():
+                            logger.debug("没有更改需要提交")
+                            return
+                    except subprocess.CalledProcessError:
+                        pass
+                    
                     self._run_git_command(['add', '.issues.json'])
                     self._run_git_command(['commit', '-m', f'更新 Issue {issue_id} 状态为 {status}'])
                 
@@ -323,6 +332,8 @@ class GitManager:
                 except subprocess.CalledProcessError as e:
                     if "nothing to commit" not in str(e):
                         logger.warning(f"提交Issue更新失败: {e}")
+                    else:
+                        logger.debug("没有更改需要提交")
                 
                 logger.info(f"更新 Issue {issue_id} 状态为 {status}")
                 return True

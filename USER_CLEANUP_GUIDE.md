@@ -61,8 +61,8 @@
 
 6. **Issues文件**
    ```bash
-   # 清空Issues
-   echo '{"issues": []}' > .issues.json
+   # 清空Issues（现在在playground仓库中）
+   echo '{"issues": []}' > agent_repos/playground/.issues.json
    ```
    - **原因**: 如果需要重新开始项目
    - **影响**: 清理后所有Issues丢失
@@ -119,7 +119,7 @@ fi
 
 read -p "🟡 是否清空Issues? (y/n): " clean_issues
 if [[ $clean_issues == "y" || $clean_issues == "Y" ]]; then
-    echo '{"issues": []}' > .issues.json
+    echo '{"issues": []}' > agent_repos/playground/.issues.json
     echo "✅ 已清空Issues"
 fi
 

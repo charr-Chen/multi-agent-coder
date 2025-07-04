@@ -174,18 +174,8 @@ class MemoryManager:
         
         return matched_memories[:limit]
     
-    def search_memories(self, query: str, limit: int = 10) -> List[Memory]:
-        """搜索记忆（别名方法，用于向后兼容）
+
         
-        Args:
-            query: 查询关键词
-            limit: 返回数量限制
-            
-        Returns:
-            匹配的记忆列表
-        """
-        return self.retrieve_memories(query, limit)
-    
     def _matches_query(self, context: str, query_lower: str) -> bool:
         """检查记忆内容是否匹配查询"""
         context_lower = context.lower()
@@ -198,35 +188,7 @@ class MemoryManager:
         
         return False
     
-    def get_recent_memories(self, hours: int = 24, limit: int = 20) -> List[Memory]:
-        """获取最近的记忆
-        
-        Args:
-            hours: 最近几小时
-            limit: 返回数量限制
-            
-        Returns:
-            最近的记忆列表
-        """
-        now = datetime.now(timezone.utc)
-        
-        # 修复时间计算逻辑
-        if hours <= 24:
-            from datetime import timedelta
-            cutoff_time = now - timedelta(hours=hours)
-        else:
-            from datetime import timedelta
-            cutoff_time = now - timedelta(hours=hours)
-        
-        recent_memories = [
-            memory for memory in self.memories
-            if memory.create_at >= cutoff_time
-        ]
-        
-        # 按创建时间倒序排序
-        recent_memories.sort(key=lambda m: m.create_at, reverse=True)
-        
-        return recent_memories[:limit]
+
     
     def get_memory_summary(self) -> str:
         """获取记忆摘要"""
@@ -239,11 +201,7 @@ class MemoryManager:
         
         return f"共有 {total_memories} 条记忆，最新记忆创建于 {latest_memory.create_at.strftime('%Y-%m-%d %H:%M:%S')}，最旧记忆创建于 {oldest_memory.create_at.strftime('%Y-%m-%d %H:%M:%S')}"
     
-    def clear_all_memories(self):
-        """清空所有记忆"""
-        self.memories.clear()
-        self._save_memories()
-        logger.info("已清空所有记忆")
+
     
     def export_memories(self, file_path: str = None) -> str:
         """导出记忆到文件
@@ -277,38 +235,9 @@ class MemoryManager:
             logger.error(f"导出记忆失败: {e}")
             raise
     
-    def view_memory_file(self) -> str:
-        """查看记忆文件内容（用于调试）"""
-        if self.memory_file.exists():
-            try:
-                with open(self.memory_file, 'r', encoding='utf-8') as f:
-                    return f.read()
-            except Exception as e:
-                logger.error(f"读取记忆文件失败: {e}")
-                return f"读取失败: {e}"
-        return "记忆文件不存在"
+
     
-    # 便捷方法：存储不同类型的记忆（使用自然语言描述）
-    def store_file_change(self, file_path: str, action: str, details: str = None):
-        """存储文件变更记忆"""
-        context = f"文件变更: {action} 文件 {file_path}"
-        if details:
-            context += f"。详情: {details}"
-        self.store_memory(context)
-    
-    def store_issue_analysis(self, issue_description: str, analysis: str, solution: str = None):
-        """存储问题分析记忆"""
-        context = f"问题分析: {issue_description}。分析结果: {analysis}"
-        if solution:
-            context += f"。解决方案: {solution}"
-        self.store_memory(context)
-    
-    def store_implementation_plan(self, task: str, plan: str, outcome: str = None):
-        """存储实现计划记忆"""
-        context = f"实现计划: 任务 '{task}'，计划 '{plan}'"
-        if outcome:
-            context += f"，结果: {outcome}"
-        self.store_memory(context)
+
     
     def store_thinking_process(self, thought: str, context_info: str = None, conclusion: str = None):
         """存储思考过程记忆"""
@@ -319,20 +248,111 @@ class MemoryManager:
             context += f"，结论: {conclusion}"
         self.store_memory(context)
     
-    def store_decision_log(self, decision: str, reasoning: str = None, outcome: str = None):
-        """存储决策日志记忆"""
-        context = f"决策记录: {decision}"
-        if reasoning:
-            context += f"，理由: {reasoning}"
-        if outcome:
-            context += f"，结果: {outcome}"
-        self.store_memory(context)
+
     
-    def store_learning_experience(self, lesson: str, context_info: str = None, improvement: str = None):
-        """存储学习经验记忆"""
-        context = f"学习经验: {lesson}"
-        if context_info:
-            context += f"，背景: {context_info}"
-        if improvement:
-            context += f"，改进建议: {improvement}"
-        self.store_memory(context) 
+    # AI思考记录方法
+    async def record_task_start_thinking(self, llm_manager, task: str):
+        """记录任务开始时的思考"""
+        try:
+            thinking_prompt = f"""
+你即将开始一个新的任务，请记录你的初始思考：
+
+任务：{task}
+
+请记录：
+1. 你对任务的理解和分析
+2. 你计划如何实现这个任务
+3. 你预计会遇到什么挑战
+4. 你的实现策略
+
+请用自然语言记录你的思考：
+"""
+            
+            thinking = await llm_manager._call_llm(thinking_prompt)
+            if thinking and thinking.strip():
+                self.store_thinking_process(thinking.strip(), f"任务开始: {task[:100]}...")
+                return thinking.strip()
+        except Exception as e:
+            logger.warning(f"记录任务开始思考失败: {e}")
+        return None
+    
+    async def record_progress_thinking(self, llm_manager, task: str, action: str, result: str, iteration: int):
+        """记录执行过程中的思考"""
+        try:
+            thinking_prompt = f"""
+基于当前的任务和操作结果，请记录你的思考过程：
+
+任务：{task}
+当前操作：{action}
+操作结果：{result[:200] if result else "无"}
+当前迭代：{iteration}
+
+请记录：
+1. 你对当前进展的分析
+2. 下一步的计划
+3. 遇到的问题和解决方案
+4. 任何重要的发现或想法
+
+请用自然语言记录你的思考：
+"""
+            
+            thinking = await llm_manager._call_llm(thinking_prompt)
+            if thinking and thinking.strip():
+                self.store_thinking_process(thinking.strip(), f"执行进展 (迭代{iteration})")
+                return thinking.strip()
+        except Exception as e:
+            logger.warning(f"记录进展思考失败: {e}")
+        return None
+    
+    async def record_task_completion_thinking(self, llm_manager, task: str, memories_text: str):
+        """记录任务完成时的思考"""
+        try:
+            thinking_prompt = f"""
+任务已经完成，请记录你的总结思考：
+
+任务：{task}
+操作记录：{memories_text}
+
+请记录：
+1. 你对任务完成情况的总结
+2. 你实现的核心功能
+3. 你学到的经验
+4. 如果有机会重新做，你会如何改进
+
+请用自然语言记录你的思考：
+"""
+            
+            thinking = await llm_manager._call_llm(thinking_prompt)
+            if thinking and thinking.strip():
+                self.store_thinking_process(thinking.strip(), f"任务完成: {task[:100]}...")
+                return thinking.strip()
+        except Exception as e:
+            logger.warning(f"记录完成思考失败: {e}")
+        return None
+    
+    async def record_task_failure_thinking(self, llm_manager, task: str, memories_text: str, iterations: int):
+        """记录任务失败时的思考"""
+        try:
+            thinking_prompt = f"""
+任务未能在最大迭代次数内完成，请记录你的分析：
+
+任务：{task}
+操作记录：{memories_text}
+迭代次数：{iterations}
+
+请记录：
+1. 你认为任务失败的原因
+2. 你遇到了什么困难
+3. 你尝试了哪些解决方案
+4. 如果给你更多时间，你会如何继续
+
+请用自然语言记录你的思考：
+"""
+            
+            thinking = await llm_manager._call_llm(thinking_prompt)
+            if thinking and thinking.strip():
+                self.store_thinking_process(thinking.strip(), f"任务失败: {task[:100]}...")
+                return thinking.strip()
+        except Exception as e:
+            logger.warning(f"记录失败思考失败: {e}")
+        return None 

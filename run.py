@@ -66,14 +66,19 @@ def get_user_repo():
     print("   - 留空使用当前目录")
     print()
     
+    user_projects_dir = os.path.join(os.getcwd(), "user_projects")
+    os.makedirs(user_projects_dir, exist_ok=True)
+    
     while True:
         try:
             repo_input = input("📁 Git仓库路径或URL: ").strip()
             
-            # 如果用户按回车，使用当前目录
+            # 如果用户按回车，使用 user_projects 目录下的当前目录名
             if not repo_input:
-                repo_path = os.getcwd()
-                print(f"📍 使用当前目录: {repo_path}")
+                repo_path = os.path.join(user_projects_dir, "current_project")
+                print(f"📍 使用 user_projects 目录: {repo_path}")
+                if not os.path.exists(repo_path):
+                    os.makedirs(repo_path)
             
             # 检查是否是GitHub URL
             elif repo_input.startswith(('https://github.com/', 'git@github.com:', 'http://github.com/')):
@@ -85,8 +90,8 @@ def get_user_repo():
                 else:
                     repo_name = repo_input.split('/')[-1]
                 
-                # 在当前目录下创建克隆目录
-                clone_dir = os.path.join(os.getcwd(), repo_name)
+                # 在 user_projects 目录下创建克隆目录
+                clone_dir = os.path.join(user_projects_dir, repo_name)
                 
                 # 检查目录是否已存在
                 if os.path.exists(clone_dir):
@@ -100,7 +105,7 @@ def get_user_repo():
                         new_name = input(f"📝 请输入新的目录名（默认：{repo_name}_clone）: ").strip()
                         if not new_name:
                             new_name = f"{repo_name}_clone"
-                        clone_dir = os.path.join(os.getcwd(), new_name)
+                        clone_dir = os.path.join(user_projects_dir, new_name)
                         
                         print(f"📥 克隆仓库到: {clone_dir}")
                         try:
@@ -135,12 +140,19 @@ def get_user_repo():
                         continue
             
             else:
-                # 处理本地路径
-                repo_path = os.path.abspath(os.path.expanduser(repo_input))
+                # 处理本地路径，统一放到 user_projects 目录下
+                abs_input_path = os.path.abspath(os.path.expanduser(repo_input))
+                repo_name = os.path.basename(abs_input_path.rstrip("/"))
+                repo_path = os.path.join(user_projects_dir, repo_name)
                 
-                # 检查路径是否存在
-                if not os.path.exists(repo_path):
-                    print(f"❌ 路径不存在: {repo_path}")
+                # 如果源路径存在且不是 user_projects 目录下的，复制到 user_projects 下
+                if os.path.exists(abs_input_path) and abs_input_path != repo_path:
+                    import shutil
+                    if not os.path.exists(repo_path):
+                        shutil.copytree(abs_input_path, repo_path)
+                        print(f"✅ 已将本地项目复制到: {repo_path}")
+                elif not os.path.exists(abs_input_path):
+                    print(f"❌ 路径不存在: {abs_input_path}")
                     print("💡 请检查路径是否正确，或输入GitHub仓库URL进行克隆")
                     continue
             

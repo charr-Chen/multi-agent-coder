@@ -144,11 +144,11 @@ class TaskProcessor:
     def process_request(self, data):
         # 实现具体的业务逻辑
         result = self.handle_data(data)
-        return {"status": "success", "result": result}
+        return {{"status": "success", "result": result}}
     
     def handle_data(self, data):
         # 根据实际需求实现处理逻辑
-        return {"processed": True, "timestamp": datetime.now()}
+        return {{"processed": True, "timestamp": datetime.now()}}
 
 【重要】
 - 只返回一个命令，不要解释

@@ -468,16 +468,31 @@ class TaskProcessor:
             else:
                 self.add_long_term_memory(f"❌ 任务未完成: {issue_title}")
             
+            # 安全地访问result字典
+            if isinstance(result, dict):
+                success = result.get("completed", False)
+                iterations = result.get("iterations", 0)
+                error = None if success else "任务未在最大迭代次数内完成"
+            else:
+                success = False
+                iterations = 0
+                error = f"返回结果格式错误: {type(result)}"
+            
             return {
-                "success": result["completed"],
-                "iterations": result["iterations"],
+                "success": success,
+                "iterations": iterations,
                 "long_term_memories": self.long_term_memories[-10:],
                 "short_term_memory": self.short_term_memory,
-                "error": None if result["completed"] else "任务未在最大迭代次数内完成"
+                "error": error
             }
                 
         except Exception as e:
-            error_msg = f"实现Issue时发生异常: {str(e)}"
+            # 安全地处理异常信息，避免格式化错误
+            try:
+                error_msg = f"实现Issue时发生异常: {str(e)}"
+            except:
+                error_msg = "实现Issue时发生未知异常"
+            
             logger.error(error_msg)
             self.add_long_term_memory(error_msg)
             return {
@@ -691,7 +706,8 @@ class TaskProcessor:
                                             # 实现Issue
                                             result = await self.implement_issue(issue)
                                             
-                                            if result["success"]:
+                                            # 安全地检查result格式
+                                            if isinstance(result, dict) and result.get("success", False):
                                                 logger.info(f"✅ Issue {issue_title} 实现成功")
                                                 self.memory_manager.store_memory(f"Issue {issue_title} 实现成功")
                                                 
@@ -710,7 +726,8 @@ class TaskProcessor:
                                                 
                                                 issues_processed += 1
                                             else:
-                                                logger.error(f"❌ Issue {issue_title} 实现失败: {result.get('error', '未知错误')}")
+                                                error_msg = result.get('error', '未知错误') if isinstance(result, dict) else str(result)
+                                                logger.error(f"❌ Issue {issue_title} 实现失败: {error_msg}")
                                                 self.memory_manager.store_memory(f"Issue {issue_title} 实现失败")
                                                 # 重新释放Issue，不要提交"实现失败"作为代码
                                                 await self.playground_git_manager.update_issue_status(

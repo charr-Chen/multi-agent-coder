@@ -95,9 +95,9 @@ class CoderAgent:
             # 获取格式化的记忆
             memories_text = self.get_formatted_memories()
             
-            # 强化的动作决策prompt - 更明确的指导
+            # 平衡的prompt - 有思考能力但输出命令
             action_prompt = f"""
-你是一个专业的程序员AI，正在通过命令行操作来实现代码功能。
+你是一个专业的顶级全栈程序员AI，正在通过命令行操作实现代码功能。
 
 【当前任务】
 {issue}
@@ -105,65 +105,44 @@ class CoderAgent:
 【历史操作记录】
 {memories_text}
 
-【执行策略】
-根据任务类型，按以下步骤执行：
+【思考过程】
+1. 分析任务需求，确定需要实现的功能
+2. 查看项目结构，了解现有代码
+3. 设计实现方案，考虑代码架构
+4. 编写具体的代码实现
 
-1. 如果是第一次执行，先用 ls -la 查看项目结构
-2. 如果需要了解现有代码，用 cat 查看具体文件
-3. 如果需要查找特定文件，用 find . -name "*.py" 
-4. 理解项目结构后，立即开始修改代码
-5. 最后用 complete 标记完成
+【常用命令提示，实际上你可以使用任何有效的终端命令】
+- ls -la                                    # 查看项目结构
+- cat <file>                               # 查看文件内容
+- find . -name "*.py"                      # 查找Python文件
+- grep -r "keyword" .                      # 搜索关键词
+- diff_file:<file>:<diff>                  # 修改文件（唯一方式）
+- complete                                 # 标记完成
 
-【可用命令】
-- ls -la                                    # 查看目录结构
-- cat path/to/file.py                       # 查看文件内容
-- find . -name "*.py"                       # 查找Python文件
-- edit_file:path/file.py:完整的Python代码    # 创建或完全重写文件
-- replace_in_file:path:旧代码:新代码          # 替换文件中的特定部分
-- pip install package_name                   # 安装Python包
-- complete                                   # 标记任务完成
+【重要规则】
+- 你可以思考和分析，但最终必须输出一个具体的命令
+- 不要输出思考过程，只输出命令
+- 修改文件必须使用diff_file命令
+- 确保代码实现完整且功能正确
 
-【关键要求】
-1. 必须修改现有代码文件，在其中添加实际的功能实现
-2. 不要只是查看文件，必须执行实际的代码修改
-3. 修改的代码必须包含完整的功能实现，不能只是注释
-4. 根据任务需求，实现相应的功能逻辑
-5. 确保代码能够解决任务中描述的具体问题
-
-【命令格式示例】
-edit_file:platform/reworkd_platform/web/api/agent/agent_api.py:
-# 根据任务需求添加相应的导入
-import os
-import json
-from datetime import datetime
-
-class TaskProcessor:
-    def __init__(self):
-        self.status = "initialized"
-    
-    def process_request(self, data):
-        # 实现具体的业务逻辑
-        result = self.handle_data(data)
-        return {{"status": "success", "result": result}}
-    
-    def handle_data(self, data):
-        # 根据实际需求实现处理逻辑
-        return {{"processed": True, "timestamp": datetime.now()}}
-
-【重要】
-- 只返回一个命令，不要解释
-- 不要使用markdown格式
-- 如果历史记录显示已经查看了文件，立即开始修改代码
-- 必须实现实际功能，不能只是添加注释
-
-命令："""
+只输出终端命令，不要其他内容。"""
             
             # 使用LLM生成动作
+            logger.info(f"📤 发送prompt给LLM，长度: {len(action_prompt)}字符")
             action = await self.llm_manager._call_llm(action_prompt)
             action = action.strip()
             
             # 增加调试日志
-            logger.info(f"🤖 LLM返回的动作: {action}")
+            logger.info(f"🤖 LLM返回的原始响应 ({len(action)}字符): {action}")
+            
+            # 检查是否包含多行响应
+            if '\n' in action:
+                lines = action.split('\n')
+                logger.info(f"📝 LLM返回了多行响应，共{len(lines)}行:")
+                for i, line in enumerate(lines[:5], 1):  # 只显示前5行
+                    logger.info(f"   行{i}: {line}")
+                if len(lines) > 5:
+                    logger.info(f"   ... 还有{len(lines)-5}行")
             
             if action == "complete":
                 self.memory_manager.store_memory("手动标记任务完成")
@@ -174,18 +153,52 @@ class TaskProcessor:
                 logger.warning(f"⚠️ LLM返回的动作无效: '{action}'")
                 self.add_long_term_memory(f"⚠️ 无效动作: '{action}'")
                 continue
+            
+            # 验证文件编辑命令格式
+            if action.startswith("diff_file:"):
+                if not self._validate_file_command(action):
+                    logger.warning(f"⚠️ diff_file命令格式无效: '{action}'")
+                    self.add_long_term_memory(f"⚠️ diff_file命令格式无效: '{action}'")
+                    
+                    # 给LLM一次重新生成的机会
+                    retry_prompt = f"""
+上次命令格式错误: {action}
+
+请重新生成一个正确的diff_file命令。格式要求:
+- diff_file:文件路径:diff内容
+
+确保每个部分都不为空。
+
+命令:"""
+                    
+                    retry_action = await self.llm_manager._call_llm(retry_prompt)
+                    retry_action = retry_action.strip()
+                    
+                    if retry_action and self._validate_file_command(retry_action):
+                        logger.info(f"🔄 重试成功，使用新命令: {retry_action}")
+                        action = retry_action
+                    else:
+                        logger.warning(f"⚠️ 重试后命令仍然无效: '{retry_action}'")
+                        continue
                 
             # 执行动作
+            logger.info(f"🔧 开始执行动作: {action}")
             return_value = self._execute_action(action)
             
             # 增加执行结果日志
-            logger.info(f"📋 动作执行结果: {return_value[:200] if return_value else 'None'}...")
+            if return_value:
+                logger.info(f"📋 动作执行结果 ({len(return_value)}字符):")
+                # 显示前300字符
+                result_preview = return_value[:300] + "..." if len(return_value) > 300 else return_value
+                logger.info(f"   {result_preview}")
+            else:
+                logger.warning(f"⚠️ 动作执行返回空结果")
             
             # 记录执行结果到长期记忆（用于操作历史）
             execution_record = f"执行: {action}"
             if return_value:
                 # 对于文件操作，只记录文件名，不记录完整内容
-                if action.startswith("edit_file:") or action.startswith("append_file:") or action.startswith("replace_in_file:"):
+                if action.startswith("diff_file:"):
                     parts = action.split(":", 2)
                     if len(parts) >= 2:
                         filename = parts[1].strip()
@@ -199,47 +212,39 @@ class TaskProcessor:
             
             self.add_long_term_memory(execution_record)
             
-            # 让AI记录自己的想法和思路到memory
+            # 适度的思考记录，保持思考能力
             if iteration_count % 3 == 0:  # 每3次迭代记录一次思考
                 await self.memory_manager.record_progress_thinking(
                     self.llm_manager, issue, action, return_value, iteration_count
                 )
             
-            # 严格的完成检查 - 确保真正修改了代码
+            # 智能完成检查 - 结合思考能力和实际文件操作
             if iteration_count > 3:  # 给足够时间进行分析和修改
-                completion_check = await self.llm_manager._call_llm(f"""
+                # 检查是否有实际的文件修改操作
+                has_file_operations = any("成功编辑文件" in memory for memory in self.long_term_memories[-10:])
+                
+                if has_file_operations:
+                    # 让AI判断任务是否真正完成
+                    completion_check = await self.llm_manager._call_llm(f"""
 检查任务完成情况：
 
-【任务】{issue}
+任务: {issue}
+操作历史: {memories_text}
 
-【操作历史】{memories_text}
+判断标准:
+1. 是否执行了文件修改操作？
+2. 修改的代码是否实现了任务要求的功能？
+3. 代码是否完整且可运行？
 
-【检查标准】
-严格检查以下条件，ALL必须满足：
+如果任务已完成且代码实现正确，回答 "yes"
+如果还有未完成的部分，回答 "no"
 
-1. ✅ 是否执行了 edit_file 或 replace_in_file 命令？
-2. ✅ 修改的文件是否包含实际的Python代码实现？
-3. ✅ 代码是否包含具体的功能函数/类，而不只是注释？
-4. ✅ 是否实现了任务要求的核心功能？
-
-【判断标准】
-检查操作历史中是否满足以下条件：
-1. 执行了 edit_file 或 replace_in_file 命令
-2. 修改的代码包含实际的功能实现（函数、类、具体的业务逻辑）
-3. 代码能够解决任务中描述的具体问题
-4. 不只是添加注释或空函数，而是有实际的代码逻辑
-
-【判断】
-如果操作历史中包含了代码修改命令，并且修改的代码包含实际的功能实现来解决任务需求，回答 "yes"
-如果只是查看文件、安装依赖、或没有实际代码修改，回答 "no"
-
-答案：""")
-                
-                if completion_check.strip().lower().startswith("yes"):
-                    # 记录任务完成时的思考
-                    await self.memory_manager.record_task_completion_thinking(self.llm_manager, issue, memories_text)
+答案:""")
                     
-                    break
+                    if completion_check.strip().lower().startswith("yes"):
+                        # 记录任务完成时的思考
+                        await self.memory_manager.record_task_completion_thinking(self.llm_manager, issue, memories_text)
+                        break
             
             iteration_count += 1
         
@@ -254,6 +259,25 @@ class TaskProcessor:
             "iterations": iteration_count,
             "final_memories": self.long_term_memories[-5:] if self.long_term_memories else []
         }
+    
+    def _validate_file_command(self, action: str) -> bool:
+        """验证diff_file命令格式"""
+        try:
+            if action.startswith("diff_file:"):
+                parts = action.split(":", 2)
+                if len(parts) != 3:
+                    return False
+                filepath, diff_content = parts[1].strip(), parts[2].strip()
+                if not filepath or not diff_content:
+                    logger.warning(f"diff_file命令缺少文件路径或diff内容")
+                    return False
+                return True
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"验证文件命令时出错: {e}")
+            return False
     
     def _execute_action(self, action: str) -> str:
         """执行动作命令 - 支持文件修改和终端执行"""
@@ -274,22 +298,21 @@ class TaskProcessor:
             logger.info(f"🔧 清理后的动作: {action}")
             
             # 检查是否是文件修改命令
-            if action.startswith("edit_file:"):
-                return self._edit_file(action)
-            elif action.startswith("append_file:"):
-                return self._append_file(action)
-            elif action.startswith("replace_in_file:"):
-                return self._replace_in_file(action)
+            if action.startswith("diff_file:"):
+                return self._apply_diff(action)
             else:
                 # 检查是否是常见的无效响应
                 invalid_responses = [
                     "我需要", "首先", "让我", "我会", "我应该", "我建议", 
                     "根据", "基于", "为了", "现在", "接下来", "然后",
                     "这个任务", "要完成", "我认为", "看起来", "似乎",
-                    "command:", "命令:", "执行:", "操作:", "步骤:"
+                    "command:", "命令:", "执行:", "操作:", "步骤:",
+                    "分析", "思考", "理解", "设计", "计划", "总结",
+                    "本任务", "这个功能", "我们需要", "应该实现"
                 ]
                 if any(action.lower().startswith(phrase.lower()) for phrase in invalid_responses):
                     logger.warning(f"⚠️ 检测到自然语言响应，非命令格式: {action}")
+                    self.add_long_term_memory(f"⚠️ 收到自然语言响应而非命令: {action[:50]}...")
                     return f"错误: 收到自然语言响应而非命令格式: {action}"
                 
                 # 处理可能的格式问题
@@ -303,13 +326,15 @@ class TaskProcessor:
                             action = potential_command
                 
                 # 直接执行action作为终端命令
-                logger.info(f"🖥️ 执行终端命令: {action}")
+                logger.info(f"🖥️ 准备执行终端命令: {action}")
+                logger.info(f"📂 执行目录: {self.user_project_path}")
                 
                 # 设置环境变量
                 env = os.environ.copy()
                 env['PYTHONPATH'] = f"{self.user_project_path}:{env.get('PYTHONPATH', '')}"
                 
                 # 执行命令
+                logger.info(f"⏳ 开始执行命令...")
                 result = subprocess.run(
                     action, 
                     shell=True, 
@@ -320,6 +345,25 @@ class TaskProcessor:
                     env=env
                 )
                 
+                # 详细记录执行结果
+                logger.info(f"✅ 命令执行完成，退出码: {result.returncode}")
+                
+                if result.stdout:
+                    logger.info(f"📤 标准输出 ({len(result.stdout)}字符):")
+                    # 显示前500字符，避免日志过长
+                    stdout_preview = result.stdout[:500] + "..." if len(result.stdout) > 500 else result.stdout
+                    logger.info(f"   {stdout_preview}")
+                else:
+                    logger.info(f"📤 标准输出: 无")
+                
+                if result.stderr:
+                    logger.warning(f"📤 错误输出 ({len(result.stderr)}字符):")
+                    # 显示前500字符，避免日志过长
+                    stderr_preview = result.stderr[:500] + "..." if len(result.stderr) > 500 else result.stderr
+                    logger.warning(f"   {stderr_preview}")
+                else:
+                    logger.info(f"📤 错误输出: 无")
+                
                 # 构建返回结果
                 output = []
                 if result.stdout:
@@ -329,110 +373,263 @@ class TaskProcessor:
                 
                 output.append(f"退出码: {result.returncode}")
                 
-                return "\n".join(output)
+                result_text = "\n".join(output)
+                logger.info(f"📋 返回给LLM的结果长度: {len(result_text)}字符")
+                
+                return result_text
             
         except subprocess.TimeoutExpired:
             return "命令执行超时（60秒）"
         except Exception as e:
             return f"命令执行失败: {str(e)}"
     
-    def _edit_file(self, action: str) -> str:
-        """编辑文件内容"""
+
+    
+    def _apply_diff(self, action: str) -> str:
+        """应用diff到文件"""
         try:
-            # 格式: edit_file:filepath:content
+            # 格式: diff_file:filepath:diff_content
             parts = action.split(":", 2)
             if len(parts) != 3:
-                return "错误: edit_file命令格式应为 edit_file:filepath:content"
+                return "错误: diff_file命令格式应为 diff_file:filepath:diff_content"
             
             filepath = parts[1].strip()
-            content = parts[2].strip()
+            diff_content = parts[2].strip()
+            
+            # 验证diff内容不为空
+            if not diff_content:
+                return f"错误: diff内容为空，拒绝应用空diff: {filepath}"
             
             # 构建完整路径
             full_path = os.path.join(self.user_project_path, filepath)
             
-            # 确保目录存在
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            logger.info(f"📝 准备应用diff到文件: {filepath}")
+            logger.info(f"📄 diff内容长度: {len(diff_content)}字符")
             
-            # 写入文件
-            with open(full_path, 'w', encoding='utf-8') as f:
-                f.write(content)
+            # 显示diff内容预览
+            diff_preview = diff_content[:200] + "..." if len(diff_content) > 200 else diff_content
+            logger.info(f"📖 diff内容预览: {diff_preview}")
             
-            logger.info(f"✅ 成功编辑文件: {filepath}")
-            return f"✅ 成功编辑文件: {filepath}"
-            
-        except Exception as e:
-            error_msg = f"编辑文件失败: {str(e)}"
-            logger.error(error_msg)
-            return error_msg
-    
-    def _append_file(self, action: str) -> str:
-        """追加内容到文件"""
-        try:
-            # 格式: append_file:filepath:content
-            parts = action.split(":", 2)
-            if len(parts) != 3:
-                return "错误: append_file命令格式应为 append_file:filepath:content"
-            
-            filepath = parts[1].strip()
-            content = parts[2].strip()
-            
-            # 构建完整路径
-            full_path = os.path.join(self.user_project_path, filepath)
-            
-            # 确保目录存在
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            
-            # 追加内容
-            with open(full_path, 'a', encoding='utf-8') as f:
-                f.write(content + "\n")
-            
-            logger.info(f"✅ 成功追加内容到文件: {filepath}")
-            return f"✅ 成功追加内容到文件: {filepath}"
-            
-        except Exception as e:
-            error_msg = f"追加文件失败: {str(e)}"
-            logger.error(error_msg)
-            return error_msg
-    
-    def _replace_in_file(self, action: str) -> str:
-        """在文件中替换内容"""
-        try:
-            # 格式: replace_in_file:filepath:old_text:new_text
-            parts = action.split(":", 3)
-            if len(parts) != 4:
-                return "错误: replace_in_file命令格式应为 replace_in_file:filepath:old_text:new_text"
-            
-            filepath = parts[1].strip()
-            old_text = parts[2].strip()
-            new_text = parts[3].strip()
-            
-            # 构建完整路径
-            full_path = os.path.join(self.user_project_path, filepath)
-            
+            # 如果文件不存在，尝试创建它
             if not os.path.exists(full_path):
-                return f"错误: 文件不存在: {filepath}"
+                logger.info(f"📁 文件不存在，将创建新文件: {filepath}")
+                # 确保目录存在
+                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                # 创建空文件
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    f.write("")
             
-            # 读取文件内容
-            with open(full_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            # 读取原文件内容
+            original_content = self._read_file_with_encoding(full_path)
             
-            # 替换内容
-            if old_text in content:
-                new_content = content.replace(old_text, new_text)
-                
+            # 使用Python的difflib来应用diff
+            result = self._apply_unified_diff(original_content, diff_content)
+            
+            if result["success"]:
                 # 写回文件
                 with open(full_path, 'w', encoding='utf-8') as f:
-                    f.write(new_content)
+                    f.write(result["new_content"])
                 
-                logger.info(f"✅ 成功替换文件内容: {filepath}")
-                return f"✅ 成功替换文件内容: {filepath}"
+                logger.info(f"✅ 成功应用diff到文件: {filepath}")
+                return f"✅ 成功应用diff到文件: {filepath} (修改后内容长度: {len(result['new_content'])}字符)"
             else:
-                return f"警告: 在文件 {filepath} 中未找到要替换的文本"
+                return f"错误: 应用diff失败: {result['error']}"
                 
         except Exception as e:
-            error_msg = f"替换文件内容失败: {str(e)}"
+            error_msg = f"应用diff失败: {str(e)}"
             logger.error(error_msg)
             return error_msg
+    
+    def _apply_unified_diff(self, original_content: str, diff_content: str) -> dict:
+        """应用unified diff到文件内容"""
+        try:
+            import difflib
+            import re
+            
+            logger.info(f"🔍 开始解析diff内容，原文件内容长度: {len(original_content)}字符")
+            logger.info(f"🔍 diff内容长度: {len(diff_content)}字符")
+            
+            # 分割原文件内容为行
+            original_lines = original_content.splitlines(keepends=True)
+            logger.info(f"🔍 原文件行数: {len(original_lines)}")
+            
+            # 解析diff内容
+            diff_lines = diff_content.splitlines()
+            logger.info(f"🔍 diff行数: {len(diff_lines)}")
+            
+            # 显示diff内容的前几行用于调试
+            for i, line in enumerate(diff_lines[:10]):
+                logger.info(f"🔍 diff行{i+1}: {repr(line)}")
+            
+            # 找到@@行，解析行号信息
+            hunk_pattern = r'@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@'
+            
+            new_lines = original_lines[:]
+            found_hunks = 0
+            
+            i = 0
+            while i < len(diff_lines):
+                line = diff_lines[i]
+                
+                # 跳过文件头
+                if line.startswith('---') or line.startswith('+++'):
+                    logger.info(f"🔍 跳过文件头: {repr(line)}")
+                    i += 1
+                    continue
+                
+                # 处理hunk
+                if line.startswith('@@'):
+                    logger.info(f"🔍 发现hunk: {repr(line)}")
+                    match = re.match(hunk_pattern, line)
+                    if not match:
+                        logger.warning(f"⚠️ hunk格式不匹配: {repr(line)}")
+                        i += 1
+                        continue
+                    
+                    found_hunks += 1
+                    old_start = int(match.group(1)) - 1  # 转换为0-based索引
+                    old_count = int(match.group(2)) if match.group(2) else 1
+                    new_start = int(match.group(3)) - 1  # 转换为0-based索引
+                    new_count = int(match.group(4)) if match.group(4) else 1
+                    
+                    logger.info(f"🔍 hunk参数: old_start={old_start}, old_count={old_count}, new_start={new_start}, new_count={new_count}")
+                    
+                    # 处理这个hunk
+                    hunk_result = self._process_hunk(
+                        new_lines, diff_lines, i + 1, old_start, old_count
+                    )
+                    
+                    if not hunk_result["success"]:
+                        logger.error(f"❌ hunk处理失败: {hunk_result['error']}")
+                        return {"success": False, "error": hunk_result["error"]}
+                    
+                    new_lines = hunk_result["new_lines"]
+                    i = hunk_result["next_index"]
+                    logger.info(f"🔍 hunk处理成功，新文件行数: {len(new_lines)}")
+                else:
+                    i += 1
+            
+            logger.info(f"🔍 总共处理了 {found_hunks} 个hunk")
+            
+            if found_hunks == 0:
+                logger.warning("⚠️ 没有找到任何有效的hunk，可能是diff格式问题")
+                # 如果没有找到hunk，但有添加行，尝试简单处理
+                additions = []
+                for line in diff_lines:
+                    if line.startswith('+') and not line.startswith('+++'):
+                        additions.append(line[1:])  # 去掉前缀
+                
+                if additions:
+                    logger.info(f"🔍 尝试简单处理，发现 {len(additions)} 个添加行")
+                    for add_line in additions:
+                        if not add_line.endswith('\n'):
+                            add_line += '\n'
+                        new_lines.append(add_line)
+                    logger.info(f"🔍 简单处理后文件行数: {len(new_lines)}")
+                else:
+                    logger.warning("⚠️ 也没有找到简单的添加行")
+            
+            new_content = ''.join(new_lines)
+            logger.info(f"🔍 最终文件内容长度: {len(new_content)}字符")
+            
+            # 显示最终内容的前几行用于调试
+            final_lines = new_content.splitlines()
+            for i, line in enumerate(final_lines[:5]):
+                logger.info(f"🔍 最终内容行{i+1}: {repr(line)}")
+            
+            return {"success": True, "new_content": new_content}
+            
+        except Exception as e:
+            logger.error(f"❌ 解析diff异常: {str(e)}")
+            return {"success": False, "error": f"解析diff失败: {str(e)}"}
+    
+    def _process_hunk(self, lines: list, diff_lines: list, start_index: int, 
+                     old_start: int, old_count: int) -> dict:
+        """处理一个diff hunk"""
+        try:
+            logger.info(f"🔍 开始处理hunk，起始索引: {start_index}, old_start: {old_start}, old_count: {old_count}")
+            logger.info(f"🔍 当前文件行数: {len(lines)}")
+            
+            deletions = []
+            additions = []
+            context_lines = []
+            
+            i = start_index
+            while i < len(diff_lines):
+                line = diff_lines[i]
+                logger.info(f"🔍 处理diff行{i+1}: {repr(line)}")
+                
+                # 如果遇到新的@@行，停止处理当前hunk
+                if line.startswith('@@'):
+                    logger.info(f"🔍 遇到新hunk，停止处理当前hunk")
+                    break
+                
+                if line.startswith('-'):
+                    # 删除行
+                    del_content = line[1:]  # 去掉前缀
+                    deletions.append(del_content)
+                    logger.info(f"🔍 删除行: {repr(del_content)}")
+                elif line.startswith('+'):
+                    # 添加行
+                    add_content = line[1:]  # 去掉前缀
+                    additions.append(add_content)
+                    logger.info(f"🔍 添加行: {repr(add_content)}")
+                elif line.startswith(' '):
+                    # 上下文行
+                    context_content = line[1:]  # 去掉前缀
+                    context_lines.append(context_content)
+                    logger.info(f"🔍 上下文行: {repr(context_content)}")
+                else:
+                    # 空行或其他，可能是hunk结束
+                    logger.info(f"🔍 遇到空行或其他，可能是hunk结束: {repr(line)}")
+                    break
+                
+                i += 1
+            
+            logger.info(f"🔍 hunk解析完成 - 删除: {len(deletions)}行, 添加: {len(additions)}行, 上下文: {len(context_lines)}行")
+            
+            # 应用修改
+            # 简单的处理：删除旧行，添加新行
+            if deletions:
+                logger.info(f"🔍 开始删除 {len(deletions)} 行")
+                # 找到要删除的行
+                for del_line in deletions:
+                    found = False
+                    for j in range(len(lines)):
+                        if lines[j].rstrip('\n') == del_line.rstrip('\n'):
+                            logger.info(f"🔍 找到并删除行{j+1}: {repr(lines[j])}")
+                            lines.pop(j)
+                            found = True
+                            break
+                    if not found:
+                        logger.warning(f"⚠️ 未找到要删除的行: {repr(del_line)}")
+            
+            # 添加新行
+            if additions:
+                logger.info(f"🔍 开始添加 {len(additions)} 行")
+                # 在适当位置插入新行
+                insert_pos = min(old_start, len(lines))
+                logger.info(f"🔍 插入位置: {insert_pos}")
+                
+                for add_line in additions:
+                    if not add_line.endswith('\n'):
+                        add_line += '\n'
+                    lines.insert(insert_pos, add_line)
+                    logger.info(f"🔍 在位置{insert_pos}插入: {repr(add_line)}")
+                    insert_pos += 1
+            
+            logger.info(f"🔍 hunk处理完成，新文件行数: {len(lines)}")
+            
+            return {
+                "success": True, 
+                "new_lines": lines, 
+                "next_index": i
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ 处理hunk异常: {str(e)}")
+            return {"success": False, "error": f"处理hunk失败: {str(e)}"}
+    
 
     async def implement_issue(self, issue: dict, max_iterations: int = 50) -> dict:
         """
@@ -535,8 +732,8 @@ class TaskProcessor:
         """从文件加载记忆"""
         try:
             import json
-            with open(input_path, 'r', encoding='utf-8') as f:
-                memory_data = json.load(f)
+            content = self._read_file_with_encoding(input_path)
+            memory_data = json.loads(content)
             
             self.long_term_memories = memory_data.get("long_term_memories", [])
             self.short_term_memory = memory_data.get("short_term_memory", "")
@@ -610,26 +807,73 @@ class TaskProcessor:
             logger.error(f"❌ 创建Pull Request失败: {e}")
             self.add_long_term_memory(f"创建Pull Request失败: {e}")
     
+    def _read_file_with_encoding(self, file_path: str) -> str:
+        """尝试用多种编码读取文件"""
+        encodings = ['utf-8', 'utf-16', 'utf-16-le', 'utf-16-be', 'latin-1', 'gbk', 'cp1252']
+        
+        for encoding in encodings:
+            try:
+                with open(file_path, 'r', encoding=encoding) as f:
+                    content = f.read()
+                    # 检查内容是否合理（不包含太多控制字符）
+                    if self._is_text_content(content):
+                        return content
+            except (UnicodeDecodeError, UnicodeError):
+                continue
+            except Exception as e:
+                logger.debug(f"尝试编码 {encoding} 读取文件 {file_path} 失败: {e}")
+                continue
+        
+        # 如果所有编码都失败，尝试以二进制方式读取并忽略错误
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+                logger.warning(f"文件 {file_path} 使用UTF-8编码读取时忽略了一些字符")
+                return content
+        except Exception as e:
+            logger.error(f"无法读取文件 {file_path}: {e}")
+            return ""
+    
+    def _is_text_content(self, content: str) -> bool:
+        """检查内容是否是合理的文本内容"""
+        if not content:
+            return True
+        
+        # 计算控制字符的比例
+        control_chars = sum(1 for c in content if ord(c) < 32 and c not in '\t\n\r')
+        total_chars = len(content)
+        
+        # 如果控制字符超过5%，认为不是文本文件
+        if total_chars > 0 and control_chars / total_chars > 0.05:
+            return False
+        
+        return True
+
     async def _get_code_changes(self) -> dict[str, str]:
         """获取代码更改"""
         try:
             code_changes = {}
             
-            # 获取当前工作目录中的所有Python文件
+            # 获取当前工作目录中的所有相关文件
             for root, dirs, files in os.walk(self.user_project_path):
                 # 跳过隐藏目录和特殊目录
-                dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['__pycache__', 'node_modules']]
+                dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['__pycache__', 'node_modules', '.memory']]
                 
                 for file in files:
-                    if file.endswith(('.py', '.js', '.ts', '.html', '.css', '.json', '.md')):
+                    # 过滤掉agent工作文件和临时文件
+                    if (file.endswith(('.py', '.js', '.ts', '.html', '.css', '.json', '.md')) and 
+                        not file.startswith('agent_') and 
+                        not file.startswith('.') and
+                        file not in ['.issues.json', '.pull_requests.json']):
+                        
                         file_path = os.path.join(root, file)
                         rel_path = os.path.relpath(file_path, self.user_project_path)
                         
                         try:
-                            with open(file_path, 'r', encoding='utf-8') as f:
-                                content = f.read()
-                                if content.strip():  # 只包含非空文件
-                                    code_changes[rel_path] = content
+                            # 尝试多种编码方式读取文件
+                            content = self._read_file_with_encoding(file_path)
+                            if content and content.strip():  # 只包含非空文件
+                                code_changes[rel_path] = content
                         except Exception as e:
                             logger.warning(f"读取文件失败 {rel_path}: {e}")
             
@@ -670,8 +914,8 @@ class TaskProcessor:
                         issues_file = os.path.join(self.playground_git_manager.repo_path, ".issues.json")
                         if os.path.exists(issues_file):
                             import json
-                            with open(issues_file, 'r', encoding='utf-8') as f:
-                                issues_data = json.load(f)
+                            content = self._read_file_with_encoding(issues_file)
+                            issues_data = json.loads(content)
                             
                             # 获取所有open状态的Issues
                             open_issues = [issue for issue in issues_data.get('issues', []) 

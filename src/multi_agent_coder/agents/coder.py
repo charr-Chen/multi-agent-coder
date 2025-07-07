@@ -446,26 +446,16 @@ class CoderAgent:
             import difflib
             import re
             
-            logger.info(f"🔍 开始解析diff内容，原文件内容长度: {len(original_content)}字符")
-            logger.info(f"🔍 diff内容长度: {len(diff_content)}字符")
-            
             # 分割原文件内容为行
             original_lines = original_content.splitlines(keepends=True)
-            logger.info(f"🔍 原文件行数: {len(original_lines)}")
             
             # 解析diff内容
             diff_lines = diff_content.splitlines()
-            logger.info(f"🔍 diff行数: {len(diff_lines)}")
-            
-            # 显示diff内容的前几行用于调试
-            for i, line in enumerate(diff_lines[:10]):
-                logger.info(f"🔍 diff行{i+1}: {repr(line)}")
             
             # 找到@@行，解析行号信息
             hunk_pattern = r'@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@'
             
             new_lines = original_lines[:]
-            found_hunks = 0
             
             i = 0
             while i < len(diff_lines):
@@ -473,26 +463,20 @@ class CoderAgent:
                 
                 # 跳过文件头
                 if line.startswith('---') or line.startswith('+++'):
-                    logger.info(f"🔍 跳过文件头: {repr(line)}")
                     i += 1
                     continue
                 
                 # 处理hunk
                 if line.startswith('@@'):
-                    logger.info(f"🔍 发现hunk: {repr(line)}")
                     match = re.match(hunk_pattern, line)
                     if not match:
-                        logger.warning(f"⚠️ hunk格式不匹配: {repr(line)}")
                         i += 1
                         continue
                     
-                    found_hunks += 1
                     old_start = int(match.group(1)) - 1  # 转换为0-based索引
                     old_count = int(match.group(2)) if match.group(2) else 1
                     new_start = int(match.group(3)) - 1  # 转换为0-based索引
                     new_count = int(match.group(4)) if match.group(4) else 1
-                    
-                    logger.info(f"🔍 hunk参数: old_start={old_start}, old_count={old_count}, new_start={new_start}, new_count={new_count}")
                     
                     # 处理这个hunk
                     hunk_result = self._process_hunk(
@@ -500,56 +484,23 @@ class CoderAgent:
                     )
                     
                     if not hunk_result["success"]:
-                        logger.error(f"❌ hunk处理失败: {hunk_result['error']}")
                         return {"success": False, "error": hunk_result["error"]}
                     
                     new_lines = hunk_result["new_lines"]
                     i = hunk_result["next_index"]
-                    logger.info(f"🔍 hunk处理成功，新文件行数: {len(new_lines)}")
                 else:
                     i += 1
             
-            logger.info(f"🔍 总共处理了 {found_hunks} 个hunk")
-            
-            if found_hunks == 0:
-                logger.warning("⚠️ 没有找到任何有效的hunk，可能是diff格式问题")
-                # 如果没有找到hunk，但有添加行，尝试简单处理
-                additions = []
-                for line in diff_lines:
-                    if line.startswith('+') and not line.startswith('+++'):
-                        additions.append(line[1:])  # 去掉前缀
-                
-                if additions:
-                    logger.info(f"🔍 尝试简单处理，发现 {len(additions)} 个添加行")
-                    for add_line in additions:
-                        if not add_line.endswith('\n'):
-                            add_line += '\n'
-                        new_lines.append(add_line)
-                    logger.info(f"🔍 简单处理后文件行数: {len(new_lines)}")
-                else:
-                    logger.warning("⚠️ 也没有找到简单的添加行")
-            
             new_content = ''.join(new_lines)
-            logger.info(f"🔍 最终文件内容长度: {len(new_content)}字符")
-            
-            # 显示最终内容的前几行用于调试
-            final_lines = new_content.splitlines()
-            for i, line in enumerate(final_lines[:5]):
-                logger.info(f"🔍 最终内容行{i+1}: {repr(line)}")
-            
             return {"success": True, "new_content": new_content}
             
         except Exception as e:
-            logger.error(f"❌ 解析diff异常: {str(e)}")
             return {"success": False, "error": f"解析diff失败: {str(e)}"}
     
     def _process_hunk(self, lines: list, diff_lines: list, start_index: int, 
                      old_start: int, old_count: int) -> dict:
         """处理一个diff hunk"""
         try:
-            logger.info(f"🔍 开始处理hunk，起始索引: {start_index}, old_start: {old_start}, old_count: {old_count}")
-            logger.info(f"🔍 当前文件行数: {len(lines)}")
-            
             deletions = []
             additions = []
             context_lines = []
@@ -557,68 +508,45 @@ class CoderAgent:
             i = start_index
             while i < len(diff_lines):
                 line = diff_lines[i]
-                logger.info(f"🔍 处理diff行{i+1}: {repr(line)}")
                 
                 # 如果遇到新的@@行，停止处理当前hunk
                 if line.startswith('@@'):
-                    logger.info(f"🔍 遇到新hunk，停止处理当前hunk")
                     break
                 
                 if line.startswith('-'):
                     # 删除行
-                    del_content = line[1:]  # 去掉前缀
-                    deletions.append(del_content)
-                    logger.info(f"🔍 删除行: {repr(del_content)}")
+                    deletions.append(line[1:])  # 去掉前缀
                 elif line.startswith('+'):
                     # 添加行
-                    add_content = line[1:]  # 去掉前缀
-                    additions.append(add_content)
-                    logger.info(f"🔍 添加行: {repr(add_content)}")
+                    additions.append(line[1:])  # 去掉前缀
                 elif line.startswith(' '):
                     # 上下文行
-                    context_content = line[1:]  # 去掉前缀
-                    context_lines.append(context_content)
-                    logger.info(f"🔍 上下文行: {repr(context_content)}")
+                    context_lines.append(line[1:])  # 去掉前缀
                 else:
                     # 空行或其他，可能是hunk结束
-                    logger.info(f"🔍 遇到空行或其他，可能是hunk结束: {repr(line)}")
                     break
                 
                 i += 1
             
-            logger.info(f"🔍 hunk解析完成 - 删除: {len(deletions)}行, 添加: {len(additions)}行, 上下文: {len(context_lines)}行")
-            
             # 应用修改
             # 简单的处理：删除旧行，添加新行
             if deletions:
-                logger.info(f"🔍 开始删除 {len(deletions)} 行")
                 # 找到要删除的行
                 for del_line in deletions:
-                    found = False
                     for j in range(len(lines)):
                         if lines[j].rstrip('\n') == del_line.rstrip('\n'):
-                            logger.info(f"🔍 找到并删除行{j+1}: {repr(lines[j])}")
                             lines.pop(j)
-                            found = True
                             break
-                    if not found:
-                        logger.warning(f"⚠️ 未找到要删除的行: {repr(del_line)}")
             
             # 添加新行
             if additions:
-                logger.info(f"🔍 开始添加 {len(additions)} 行")
                 # 在适当位置插入新行
                 insert_pos = min(old_start, len(lines))
-                logger.info(f"🔍 插入位置: {insert_pos}")
-                
                 for add_line in additions:
                     if not add_line.endswith('\n'):
                         add_line += '\n'
                     lines.insert(insert_pos, add_line)
-                    logger.info(f"🔍 在位置{insert_pos}插入: {repr(add_line)}")
                     insert_pos += 1
-            
-            logger.info(f"🔍 hunk处理完成，新文件行数: {len(lines)}")
             
             return {
                 "success": True, 
@@ -627,7 +555,6 @@ class CoderAgent:
             }
             
         except Exception as e:
-            logger.error(f"❌ 处理hunk异常: {str(e)}")
             return {"success": False, "error": f"处理hunk失败: {str(e)}"}
     
 

@@ -167,6 +167,9 @@ class CollaborationManager:
     async def _save_pull_request(self, pr: PullRequest):
         """保存PR到文件"""
         try:
+            # 确保PR文件存在
+            self._ensure_pr_file()
+            
             # 读取现有PR
             with open(self.pr_file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -229,6 +232,8 @@ class CollaborationManager:
             是否审核成功
         """
         try:
+            # 确保PR文件存在
+            self._ensure_pr_file()
             # 读取PR
             with open(self.pr_file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -407,7 +412,12 @@ class CollaborationManager:
                 '*.pyc',
                 '*.pyo',
                 '.DS_Store',
-                'Thumbs.db'
+                'Thumbs.db',
+                'agent_*',  # 忽略agent工作文件
+                '.memory',  # 忽略memory目录
+                '*.log',    # 忽略日志文件
+                '.issues.json',  # 忽略issues文件
+                '.pull_requests.json'  # 忽略PR文件
             ]
             
             def should_ignore(path):

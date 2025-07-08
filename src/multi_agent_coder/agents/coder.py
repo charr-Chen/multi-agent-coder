@@ -96,6 +96,33 @@ class CoderAgent:
             memories_text = self.get_formatted_memories()
             
             # 平衡的prompt - 有思考能力但输出命令
+            diff_examples = (
+                """--- a/foo.py
++++ b/foo.py
+@@ -1,3 +1,4 @@
+ def foo():
+     print(\"hello\")
++    print(\"world\")
+"""
+                """--- a/bar.txt
++++ b/bar.txt
+@@ -2,7 +2,8 @@
+line1
+-line2
++line2 changed
+line3
++new line4
+line5
+"""
+                """--- a/test.js
++++ b/test.js
+@@ -10,6 +10,8 @@
+ function test() {
+     doSomething();
++    log(\"added\");
+ }
+"""
+            )
             action_prompt = f"""
 你是一个专业的顶级全栈程序员AI，正在通过命令行操作实现代码功能。
 
@@ -105,26 +132,56 @@ class CoderAgent:
 【历史操作记录】
 {memories_text}
 
-【思考过程】
-1. 分析任务需求，确定需要实现的功能
-2. 查看项目结构，了解现有代码
-3. 设计实现方案，考虑代码架构
-4. 编写具体的代码实现
-
 【常用命令提示，实际上你可以使用任何有效的终端命令】
 - ls -la                                    # 查看项目结构
 - cat <file>                               # 查看文件内容
 - find . -name "*.py"                      # 查找Python文件
 - grep -r "keyword" .                      # 搜索关键词
-- diff_file:<file>:<diff>                  # 修改文件（唯一方式）
+- cat > tmp.patch <<EOF
+  <这里替换为多行 diff patch 内容>
+  EOF                                      # 创建patch文件
+- patch <目标文件路径> < tmp.patch           # 应用patch修改原始文件
 - complete                                 # 标记完成
 
-【重要规则】
-- 你可以思考和分析，但最终必须输出一个具体的命令
-- 不要输出思考过程，只输出命令
-- 修改文件必须使用diff_file命令
-- 确保代码实现完整且功能正确
+```bash
+cat > tmp.patch <<EOF
+--- main.py	2025-07-07 11:00:00.000000000 +0800
++++ main.py	2025-07-07 11:01:00.000000000 +0800
+@@ -1,2 +1,2 @@
+-print("Hello")
++print("Hi")
+EOF
 
+patch main.py < tmp.patch
+```
+
+【重要规则】
+- 修改文件必须分两步：先用cat > <patch_file>创建patch文件，再用patch命令应用
+- 不要使用其他方式修改文件，这是唯一的方式
+- patch文件内容必须是**严格的unified diff格式**，不能有多余空行，不能有多余的空白字符，必须能被patch工具直接应用
+- patch内容必须包含完整的文件头（--- 和 +++ 行）、@@行（显示行号信息），每行修改前必须有+、-或空格前缀
+
+【patch文件创建格式说明】
+```bash
+cat > filename.patch <<EOF
+--- a/file.py
++++ b/file.py
+@@ -1,3 +1,4 @@
+ def hello():
+     print("Hello")
++    print("World")
+EOF
+```
+- patch文件名：patch文件的名称，如changes.patch
+- patch内容：标准的unified diff格式，包含文件头和@@行
+- 使用EOF作为分隔符来包含多行patch内容
+
+【真实diff示例1】
+{diff_examples[0]}
+【真实diff示例2】
+{diff_examples[1]}
+【真实diff示例3】
+{diff_examples[2]}
 只输出终端命令，不要其他内容。"""
             
             # 使用LLM生成动作
@@ -154,32 +211,10 @@ class CoderAgent:
                 self.add_long_term_memory(f"⚠️ 无效动作: '{action}'")
                 continue
             
-            # 验证文件编辑命令格式
-            if action.startswith("diff_file:"):
-                if not self._validate_file_command(action):
-                    logger.warning(f"⚠️ diff_file命令格式无效: '{action}'")
-                    self.add_long_term_memory(f"⚠️ diff_file命令格式无效: '{action}'")
-                    
-                    # 给LLM一次重新生成的机会
-                    retry_prompt = f"""
-上次命令格式错误: {action}
-
-请重新生成一个正确的diff_file命令。格式要求:
-- diff_file:文件路径:diff内容
-
-确保每个部分都不为空。
-
-命令:"""
-                    
-                    retry_action = await self.llm_manager._call_llm(retry_prompt)
-                    retry_action = retry_action.strip()
-                    
-                    if retry_action and self._validate_file_command(retry_action):
-                        logger.info(f"🔄 重试成功，使用新命令: {retry_action}")
-                        action = retry_action
-                    else:
-                        logger.warning(f"⚠️ 重试后命令仍然无效: '{retry_action}'")
-                        continue
+            # 验证patch命令格式
+            if action.startswith("cat > ") and "<<EOF" in action:
+                # 对于cat格式，我们直接执行，不进行预验证
+                pass
                 
             # 执行动作
             logger.info(f"🔧 开始执行动作: {action}")
@@ -198,13 +233,11 @@ class CoderAgent:
             execution_record = f"执行: {action}"
             if return_value:
                 # 对于文件操作，只记录文件名，不记录完整内容
-                if action.startswith("diff_file:"):
-                    parts = action.split(":", 2)
-                    if len(parts) >= 2:
-                        filename = parts[1].strip()
-                        execution_record += f" → ✅ 成功编辑文件: {filename}"
-                    else:
-                        execution_record += f" → {return_value[:50]}..."
+                if action.startswith("cat > ") and "<<EOF" in action:
+                    # 提取patch文件名
+                    first_line = action.split('\n')[0].strip()
+                    patch_filename = first_line.replace("cat > ", "").replace(" <<EOF", "").strip()
+                    execution_record += f" → ✅ 成功创建patch文件: {patch_filename}"
                 else:
                     # 对于其他命令，限制输出长度
                     result_preview = return_value[:100] + "..." if len(return_value) > 100 else return_value
@@ -220,8 +253,8 @@ class CoderAgent:
             
             # 智能完成检查 - 结合思考能力和实际文件操作
             if iteration_count > 3:  # 给足够时间进行分析和修改
-                # 检查是否有实际的文件修改操作
-                has_file_operations = any("成功编辑文件" in memory for memory in self.long_term_memories[-10:])
+                # 检查是否有实际的文件修改操作（创建patch文件或应用patch）
+                has_file_operations = any("成功创建patch文件" in memory or "patch" in memory for memory in self.long_term_memories[-10:])
                 
                 if has_file_operations:
                     # 让AI判断任务是否真正完成
@@ -260,24 +293,7 @@ class CoderAgent:
             "final_memories": self.long_term_memories[-5:] if self.long_term_memories else []
         }
     
-    def _validate_file_command(self, action: str) -> bool:
-        """验证diff_file命令格式"""
-        try:
-            if action.startswith("diff_file:"):
-                parts = action.split(":", 2)
-                if len(parts) != 3:
-                    return False
-                filepath, diff_content = parts[1].strip(), parts[2].strip()
-                if not filepath or not diff_content:
-                    logger.warning(f"diff_file命令缺少文件路径或diff内容")
-                    return False
-                return True
-                
-            return True
-            
-        except Exception as e:
-            logger.error(f"验证文件命令时出错: {e}")
-            return False
+
     
     def _execute_action(self, action: str) -> str:
         """执行动作命令 - 支持文件修改和终端执行"""
@@ -291,92 +307,73 @@ class CoderAgent:
                 if len(lines) >= 3:
                     action = '\n'.join(lines[1:-1]).strip()
             
-            # 如果action包含多行，只取第一行
-            if '\n' in action:
+            
+            if '\n' in action and not action.startswith("cat > "):
                 action = action.split('\n')[0].strip()
             
             logger.info(f"🔧 清理后的动作: {action}")
             
-            # 检查是否是文件修改命令
-            if action.startswith("diff_file:"):
-                return self._apply_diff(action)
+            # 检查是否是创建patch文件命令
+            if action.startswith("cat > ") and "<<EOF" in action:
+                return self._create_patch_file(action)
+            # 检查是否是patch命令
+            elif action.startswith("patch "):
+                # 直接执行patch命令
+                pass  # 下面会走到通用命令执行逻辑
+            # 其他命令直接尝试执行，失败了再反馈
+            # 直接执行action作为终端命令
+            logger.info(f"🖥️ 准备执行终端命令: {action}")
+            logger.info(f"📂 执行目录: {self.user_project_path}")
+            
+            # 设置环境变量
+            env = os.environ.copy()
+            env['PYTHONPATH'] = f"{self.user_project_path}:{env.get('PYTHONPATH', '')}"
+            
+            # 执行命令
+            logger.info(f"⏳ 开始执行命令...")
+            import subprocess
+            result = subprocess.run(
+                action, 
+                shell=True, 
+                capture_output=True, 
+                text=True, 
+                cwd=self.user_project_path, 
+                timeout=60,  # 增加超时时间
+                env=env
+            )
+            
+            # 详细记录执行结果
+            logger.info(f"✅ 命令执行完成，退出码: {result.returncode}")
+            
+            if result.stdout:
+                logger.info(f"📤 标准输出 ({len(result.stdout)}字符):")
+                # 显示前500字符，避免日志过长
+                stdout_preview = result.stdout[:500] + "..." if len(result.stdout) > 500 else result.stdout
+                logger.info(f"   {stdout_preview}")
             else:
-                # 检查是否是常见的无效响应
-                invalid_responses = [
-                    "我需要", "首先", "让我", "我会", "我应该", "我建议", 
-                    "根据", "基于", "为了", "现在", "接下来", "然后",
-                    "这个任务", "要完成", "我认为", "看起来", "似乎",
-                    "command:", "命令:", "执行:", "操作:", "步骤:",
-                    "分析", "思考", "理解", "设计", "计划", "总结",
-                    "本任务", "这个功能", "我们需要", "应该实现"
-                ]
-                if any(action.lower().startswith(phrase.lower()) for phrase in invalid_responses):
-                    logger.warning(f"⚠️ 检测到自然语言响应，非命令格式: {action}")
-                    self.add_long_term_memory(f"⚠️ 收到自然语言响应而非命令: {action[:50]}...")
-                    return f"错误: 收到自然语言响应而非命令格式: {action}"
-                
-                # 处理可能的格式问题
-                if ":" in action and not action.startswith(("edit_file:", "append_file:", "replace_in_file:")):
-                    # 可能是 "命令: ls -la" 这种格式，提取冒号后的部分
-                    parts = action.split(":", 1)
-                    if len(parts) == 2:
-                        potential_command = parts[1].strip()
-                        if potential_command and not any(potential_command.startswith(phrase) for phrase in invalid_responses):
-                            logger.info(f"🔧 提取冒号后的命令: {potential_command}")
-                            action = potential_command
-                
-                # 直接执行action作为终端命令
-                logger.info(f"🖥️ 准备执行终端命令: {action}")
-                logger.info(f"📂 执行目录: {self.user_project_path}")
-                
-                # 设置环境变量
-                env = os.environ.copy()
-                env['PYTHONPATH'] = f"{self.user_project_path}:{env.get('PYTHONPATH', '')}"
-                
-                # 执行命令
-                logger.info(f"⏳ 开始执行命令...")
-                result = subprocess.run(
-                    action, 
-                    shell=True, 
-                    capture_output=True, 
-                    text=True, 
-                    cwd=self.user_project_path, 
-                    timeout=60,  # 增加超时时间
-                    env=env
-                )
-                
-                # 详细记录执行结果
-                logger.info(f"✅ 命令执行完成，退出码: {result.returncode}")
-                
-                if result.stdout:
-                    logger.info(f"📤 标准输出 ({len(result.stdout)}字符):")
-                    # 显示前500字符，避免日志过长
-                    stdout_preview = result.stdout[:500] + "..." if len(result.stdout) > 500 else result.stdout
-                    logger.info(f"   {stdout_preview}")
-                else:
-                    logger.info(f"📤 标准输出: 无")
-                
-                if result.stderr:
-                    logger.warning(f"📤 错误输出 ({len(result.stderr)}字符):")
-                    # 显示前500字符，避免日志过长
-                    stderr_preview = result.stderr[:500] + "..." if len(result.stderr) > 500 else result.stderr
-                    logger.warning(f"   {stderr_preview}")
-                else:
-                    logger.info(f"📤 错误输出: 无")
-                
-                # 构建返回结果
-                output = []
-                if result.stdout:
-                    output.append(f"标准输出:\n{result.stdout}")
-                if result.stderr:
-                    output.append(f"错误输出:\n{result.stderr}")
-                
-                output.append(f"退出码: {result.returncode}")
-                
-                result_text = "\n".join(output)
-                logger.info(f"📋 返回给LLM的结果长度: {len(result_text)}字符")
-                
-                return result_text
+                logger.info(f"📤 标准输出: 无")
+            
+            if result.stderr:
+                logger.warning(f"📤 错误输出 ({len(result.stderr)}字符):")
+                # 显示前500字符，避免日志过长
+                stderr_preview = result.stderr[:500] + "..." if len(result.stderr) > 500 else result.stderr
+                logger.warning(f"   {stderr_preview}")
+            else:
+                logger.info(f"📤 错误输出: 无")
+            
+            # 构建返回结果
+            output = []
+            if result.stdout:
+                output.append(f"标准输出:\n{result.stdout}")
+            if result.stderr:
+                output.append(f"错误输出:\n{result.stderr}")
+            
+            output.append(f"退出码: {result.returncode}")
+            
+            result_text = "\n".join(output)
+            logger.info(f"📋 返回给LLM的结果长度: {len(result_text)}字符")
+            
+            return result_text
             
         except subprocess.TimeoutExpired:
             return "命令执行超时（60秒）"
@@ -385,178 +382,67 @@ class CoderAgent:
     
 
     
-    def _apply_diff(self, action: str) -> str:
-        """应用diff到文件"""
+    def _create_patch_file(self, action: str) -> str:
+        """创建patch文件"""
         try:
-            # 格式: diff_file:filepath:diff_content
-            parts = action.split(":", 2)
-            if len(parts) != 3:
-                return "错误: diff_file命令格式应为 diff_file:filepath:diff_content"
+            # 解析 cat > filename <<EOF ... EOF 格式
+            lines = action.split('\n')
+            if len(lines) < 3:
+                return "错误: cat命令格式错误，需要至少3行"
             
-            filepath = parts[1].strip()
-            diff_content = parts[2].strip()
+            # 第一行应该是: cat > filename <<EOF
+            first_line = lines[0].strip()
+            if not first_line.startswith("cat > "):
+                return "错误: cat命令格式错误"
             
-            # 验证diff内容不为空
-            if not diff_content:
-                return f"错误: diff内容为空，拒绝应用空diff: {filepath}"
+            # 提取文件名
+            filename_part = first_line.replace("cat > ", "").replace(" <<EOF", "").strip()
+            patch_filename = filename_part
             
-            # 构建完整路径
-            full_path = os.path.join(self.user_project_path, filepath)
+            # 查找EOF结束标记
+            eof_found = False
+            content_lines = []
+            for i, line in enumerate(lines[1:], 1):
+                if line.strip() == "EOF":
+                    eof_found = True
+                    break
+                content_lines.append(line)
             
-            logger.info(f"📝 准备应用diff到文件: {filepath}")
-            logger.info(f"📄 diff内容长度: {len(diff_content)}字符")
+            if not eof_found:
+                return "错误: 未找到EOF结束标记"
             
-            # 显示diff内容预览
-            diff_preview = diff_content[:200] + "..." if len(diff_content) > 200 else diff_content
-            logger.info(f"📖 diff内容预览: {diff_preview}")
+            patch_content = '\n'.join(content_lines)
             
-            # 如果文件不存在，尝试创建它
-            if not os.path.exists(full_path):
-                logger.info(f"📁 文件不存在，将创建新文件: {filepath}")
-                # 确保目录存在
-                os.makedirs(os.path.dirname(full_path), exist_ok=True)
-                # 创建空文件
-                with open(full_path, 'w', encoding='utf-8') as f:
-                    f.write("")
+            # 验证patch内容不为空
+            if not patch_content:
+                return f"错误: patch内容为空，拒绝创建空patch文件: {patch_filename}"
             
-            # 读取原文件内容
-            original_content = self._read_file_with_encoding(full_path)
+            # 构建patch文件的完整路径
+            patch_path = os.path.join(self.user_project_path, patch_filename)
             
-            # 使用Python的difflib来应用diff
-            result = self._apply_unified_diff(original_content, diff_content)
+            logger.info(f"📝 准备创建patch文件: {patch_filename}")
+            logger.info(f"📄 patch内容长度: {len(patch_content)}字符")
             
-            if result["success"]:
-                # 写回文件
-                with open(full_path, 'w', encoding='utf-8') as f:
-                    f.write(result["new_content"])
-                
-                logger.info(f"✅ 成功应用diff到文件: {filepath}")
-                return f"✅ 成功应用diff到文件: {filepath} (修改后内容长度: {len(result['new_content'])}字符)"
-            else:
-                return f"错误: 应用diff失败: {result['error']}"
+            # 显示patch内容预览
+            patch_preview = patch_content[:200] + "..." if len(patch_content) > 200 else patch_content
+            logger.info(f"📖 patch内容预览: {patch_preview}")
+            
+            # 确保目录存在
+            os.makedirs(os.path.dirname(patch_path), exist_ok=True)
+            
+            # 写入patch文件
+            with open(patch_path, 'w', encoding='utf-8') as f:
+                f.write(patch_content)
+            
+            logger.info(f"✅ 成功创建patch文件: {patch_filename}")
+            return f"✅ 成功创建patch文件: {patch_filename} (内容长度: {len(patch_content)}字符)"
                 
         except Exception as e:
-            error_msg = f"应用diff失败: {str(e)}"
+            error_msg = f"创建patch文件失败: {str(e)}"
             logger.error(error_msg)
             return error_msg
     
-    def _apply_unified_diff(self, original_content: str, diff_content: str) -> dict:
-        """应用unified diff到文件内容"""
-        try:
-            import difflib
-            import re
-            
-            # 分割原文件内容为行
-            original_lines = original_content.splitlines(keepends=True)
-            
-            # 解析diff内容
-            diff_lines = diff_content.splitlines()
-            
-            # 找到@@行，解析行号信息
-            hunk_pattern = r'@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@'
-            
-            new_lines = original_lines[:]
-            
-            i = 0
-            while i < len(diff_lines):
-                line = diff_lines[i]
-                
-                # 跳过文件头
-                if line.startswith('---') or line.startswith('+++'):
-                    i += 1
-                    continue
-                
-                # 处理hunk
-                if line.startswith('@@'):
-                    match = re.match(hunk_pattern, line)
-                    if not match:
-                        i += 1
-                        continue
-                    
-                    old_start = int(match.group(1)) - 1  # 转换为0-based索引
-                    old_count = int(match.group(2)) if match.group(2) else 1
-                    new_start = int(match.group(3)) - 1  # 转换为0-based索引
-                    new_count = int(match.group(4)) if match.group(4) else 1
-                    
-                    # 处理这个hunk
-                    hunk_result = self._process_hunk(
-                        new_lines, diff_lines, i + 1, old_start, old_count
-                    )
-                    
-                    if not hunk_result["success"]:
-                        return {"success": False, "error": hunk_result["error"]}
-                    
-                    new_lines = hunk_result["new_lines"]
-                    i = hunk_result["next_index"]
-                else:
-                    i += 1
-            
-            new_content = ''.join(new_lines)
-            return {"success": True, "new_content": new_content}
-            
-        except Exception as e:
-            return {"success": False, "error": f"解析diff失败: {str(e)}"}
-    
-    def _process_hunk(self, lines: list, diff_lines: list, start_index: int, 
-                     old_start: int, old_count: int) -> dict:
-        """处理一个diff hunk"""
-        try:
-            deletions = []
-            additions = []
-            context_lines = []
-            
-            i = start_index
-            while i < len(diff_lines):
-                line = diff_lines[i]
-                
-                # 如果遇到新的@@行，停止处理当前hunk
-                if line.startswith('@@'):
-                    break
-                
-                if line.startswith('-'):
-                    # 删除行
-                    deletions.append(line[1:])  # 去掉前缀
-                elif line.startswith('+'):
-                    # 添加行
-                    additions.append(line[1:])  # 去掉前缀
-                elif line.startswith(' '):
-                    # 上下文行
-                    context_lines.append(line[1:])  # 去掉前缀
-                else:
-                    # 空行或其他，可能是hunk结束
-                    break
-                
-                i += 1
-            
-            # 应用修改
-            # 简单的处理：删除旧行，添加新行
-            if deletions:
-                # 找到要删除的行
-                for del_line in deletions:
-                    for j in range(len(lines)):
-                        if lines[j].rstrip('\n') == del_line.rstrip('\n'):
-                            lines.pop(j)
-                            break
-            
-            # 添加新行
-            if additions:
-                # 在适当位置插入新行
-                insert_pos = min(old_start, len(lines))
-                for add_line in additions:
-                    if not add_line.endswith('\n'):
-                        add_line += '\n'
-                    lines.insert(insert_pos, add_line)
-                    insert_pos += 1
-            
-            return {
-                "success": True, 
-                "new_lines": lines, 
-                "next_index": i
-            }
-            
-        except Exception as e:
-            return {"success": False, "error": f"处理hunk失败: {str(e)}"}
-    
+
 
     async def implement_issue(self, issue: dict, max_iterations: int = 50) -> dict:
         """

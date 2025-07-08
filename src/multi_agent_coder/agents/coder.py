@@ -160,6 +160,8 @@ patch main.py < tmp.patch
 - 不要使用其他方式修改文件，这是唯一的方式
 - patch文件内容必须是**严格的unified diff格式**，不能有多余空行，不能有多余的空白字符，必须能被patch工具直接应用
 - patch内容必须包含完整的文件头（--- 和 +++ 行）、@@行（显示行号信息），每行修改前必须有+、-或空格前缀
+- **避免重复创建patch文件**：如果已经创建了一个patch文件来实现任务要求，不要再创建类似的patch文件进行"优化"
+- **任务完成标准**：一旦创建了有效的patch文件并应用成功，通常任务就已经完成，除非有明确的错误需要修复
 
 【patch文件创建格式说明】
 ```bash
@@ -257,8 +259,34 @@ EOF
                 has_file_operations = any("成功创建patch文件" in memory or "patch" in memory for memory in self.long_term_memories[-10:])
                 
                 if has_file_operations:
-                    # 让AI判断任务是否真正完成
-                    completion_check = await self.llm_manager._call_llm(f"""
+                    # 检查最近是否创建了patch文件
+                    recent_patch_creations = [memory for memory in self.long_term_memories[-5:] if "成功创建patch文件" in memory]
+                    
+                    # 如果最近创建了patch文件，更严格地检查任务完成情况
+                    if recent_patch_creations:
+                        completion_check = await self.llm_manager._call_llm(f"""
+检查任务完成情况：
+
+任务: {issue}
+操作历史: {memories_text}
+
+重要提醒：
+- 如果已经创建了patch文件来修改配置或代码，通常任务就已经完成了
+- 不要为了"优化"而重复创建类似的patch文件
+- 简单的配置更新通常一个patch文件就足够了
+
+判断标准:
+1. 是否执行了文件修改操作？
+2. 修改的代码是否实现了任务要求的功能？
+3. 代码是否完整且可运行？
+
+如果任务已完成且代码实现正确，回答 "yes"
+如果还有未完成的部分，回答 "no"
+
+答案:""")
+                    else:
+                        # 普通的完成检查
+                        completion_check = await self.llm_manager._call_llm(f"""
 检查任务完成情况：
 
 任务: {issue}

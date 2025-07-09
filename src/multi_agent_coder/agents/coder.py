@@ -138,7 +138,6 @@ line5
 - find . -name "*.py" -type f              # 查找Python文件
 - find . -name "*.js" -type f              # 查找JavaScript文件  
 - find . -name "*.json" -type f            # 查找配置文件
-- grep -r "keyword" . --include="*.py"     # 在Python文件中搜索关键词
 - cat <file>                               # 查看文件内容
 - find . -name "*.py"                      # 查找Python文件
 - grep -r "keyword" .                      # 搜索关键词
@@ -161,6 +160,15 @@ patch main.py < tmp.patch
 ```
 
 【重要规则】
+- 系统性地探索项目的结构，目录树结构，不要猜测文件位置，而是通过命令全面了解项目
+- 系统性地探索文件内容，绝对不要猜测内容，充分理解现有代码内容后再修改
+- **严禁假设和幻觉**：绝对不要说"假设找到了xxx文件"、"查看了该文件"、"确认了调用逻辑"等没有实际执行命令的描述
+- **只能基于命令输出描述**：你只能基于实际执行命令的真实输出来描述文件内容，禁止凭空想象文件内容或结构
+- 不能假设找到了某个符合要求的文件，必须是查看后确认实际存在且对应用户需求的文件
+- 不要通过搜索关键词的方式查找需求修改的文件，而是通过实实在在地查看每个文件的内容确定哪里需要修改
+- 修改文件前必须确认用户传入的项目里实际存在这个文件
+- patch文件中的"原始代码"与实际文件内容必须是匹配的，与实际修改的目标文件一致
+- 修改的不能是自己新创建的文件，也不能是.memory里假设的文件，必须是在用户传入项目里实际存在的文件
 - 修改文件必须分两步：先用cat > <patch_file>创建patch文件，再用patch命令应用
 - 不要使用其他方式修改文件，这是唯一的方式
 - patch文件内容必须是**严格的unified diff格式**，不能有多余空行，不能有多余的空白字符，必须能被patch工具直接应用
@@ -252,7 +260,11 @@ patch main.py < fix.patch
                     # 提取patch文件名
                     first_line = action.split('\n')[0].strip()
                     patch_filename = first_line.replace("cat > ", "").replace(" <<EOF", "").strip()
-                    execution_record += f" → ✅ 成功创建patch文件: {patch_filename}"
+                    # 简单验证：检查文件是否真的存在
+                    if os.path.exists(os.path.join(self.user_project_path, patch_filename)):
+                        execution_record += f" → ✅ 成功创建patch文件: {patch_filename}"
+                    else:
+                        execution_record += f" → ❌ 失败：patch文件未创建"
                 else:
                     # 对于其他命令，限制输出长度
                     result_preview = return_value[:100] + "..." if len(return_value) > 100 else return_value

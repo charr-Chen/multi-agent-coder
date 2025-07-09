@@ -80,9 +80,18 @@ class LLMManager:
     
     async def _call_llm(self, prompt: str, temperature: float = 0.7) -> str:
         """调用LLM API"""
+        # 添加详细的prompt日志
+        logger.info(f"🤖 LLM调用开始")
+        logger.info(f"📊 参数: model={LLM_CONFIG['model']}, temperature={temperature}, max_tokens={LLM_CONFIG['max_tokens']}")
+        logger.info(f"📝 Prompt长度: {len(prompt)}字符")
+        logger.info(f"=" * 60)
+        logger.info(f"📋 完整Prompt内容:")
+        logger.info(prompt)
+        logger.info(f"=" * 60)
+        
         for attempt in range(self.max_retries + 1):
             try:
-                logger.debug(f"LLM调用尝试 {attempt + 1}/{self.max_retries + 1}")
+                logger.info(f"🔄 LLM调用尝试 {attempt + 1}/{self.max_retries + 1}")
                 response = await self.client.chat.completions.create(
                     model=LLM_CONFIG["model"],
                     messages=[
@@ -93,7 +102,11 @@ class LLMManager:
                 )
                 
                 content = response.choices[0].message.content.strip()
-                logger.debug(f"LLM响应: {content[:200]}...")
+                logger.info(f"✅ LLM响应成功，内容长度: {len(content)}字符")
+                logger.info(f"📋 LLM完整响应:")
+                logger.info(f"=" * 60)
+                logger.info(content)
+                logger.info(f"=" * 60)
                 return content
                 
             except Exception as e:

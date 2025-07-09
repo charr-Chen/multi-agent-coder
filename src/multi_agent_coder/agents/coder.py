@@ -33,7 +33,7 @@ class CoderAgent:
         self.agent_id = agent_id
         self.llm_manager = llm_manager
         self.user_project_path = user_project_path
-        self.git_manager = GitManager(user_project_path)
+        # 注意：Issues管理通过playground_git_manager完成，不在用户项目目录中创建GitManager
         
         # 初始化记忆管理器
         if memory_manager is None:
@@ -134,6 +134,11 @@ line5
 
 【常用命令提示，实际上你可以使用任何有效的终端命令】
 - ls -la                                    # 查看项目结构
+- tree                                      # 查看目录树结构(如果可用)
+- find . -name "*.py" -type f              # 查找Python文件
+- find . -name "*.js" -type f              # 查找JavaScript文件  
+- find . -name "*.json" -type f            # 查找配置文件
+- grep -r "keyword" . --include="*.py"     # 在Python文件中搜索关键词
 - cat <file>                               # 查看文件内容
 - find . -name "*.py"                      # 查找Python文件
 - grep -r "keyword" .                      # 搜索关键词
@@ -173,18 +178,13 @@ cat > filename.patch <<EOF
      print("Hello")
 +    print("World")
 EOF
+patch main.py < fix.patch
 ```
 - patch文件名：patch文件的名称，如changes.patch
 - patch内容：标准的unified diff格式，包含文件头和@@行
 - 使用EOF作为分隔符来包含多行patch内容
 
-【真实diff示例1】
-{diff_examples[0]}
-【真实diff示例2】
-{diff_examples[1]}
-【真实diff示例3】
-{diff_examples[2]}
-只输出终端命令，不要其他内容。"""
+你可以输出多行命令，每行一个命令。先探索项目结构，找到需要修改的文件，理解代码后再进行修改。"""
             
             # 使用LLM生成动作
             logger.info(f"📤 发送prompt给LLM，长度: {len(action_prompt)}字符")
@@ -194,29 +194,42 @@ EOF
             # 增加调试日志
             logger.info(f"🤖 LLM返回的原始响应 ({len(action)}字符): {action}")
             
-            # 检查是否包含多行响应
+            # 处理多行命令
             if '\n' in action:
-                lines = action.split('\n')
-                logger.info(f"📝 LLM返回了多行响应，共{len(lines)}行:")
-                for i, line in enumerate(lines[:5], 1):  # 只显示前5行
-                    logger.info(f"   行{i}: {line}")
-                if len(lines) > 5:
-                    logger.info(f"   ... 还有{len(lines)-5}行")
-            
-            if action == "complete":
-                self.memory_manager.store_memory("手动标记任务完成")
-                break
-            
-            # 验证动作格式
-            if not action or len(action) < 2:
-                logger.warning(f"⚠️ LLM返回的动作无效: '{action}'")
-                self.add_long_term_memory(f"⚠️ 无效动作: '{action}'")
-                continue
-            
-            # 验证patch命令格式
-            if action.startswith("cat > ") and "<<EOF" in action:
-                # 对于cat格式，我们直接执行，不进行预验证
-                pass
+                # 分割成多个命令
+                commands = [cmd.strip() for cmd in action.split('\n') if cmd.strip()]
+                logger.info(f"📝 LLM返回了{len(commands)}个命令:")
+                for i, cmd in enumerate(commands, 1):
+                    logger.info(f"   命令{i}: {cmd}")
+                
+                # 执行每个命令
+                all_results = []
+                for i, cmd in enumerate(commands, 1):
+                    if cmd == "complete":
+                        self.memory_manager.store_memory("手动标记任务完成")
+                        break
+                    
+                    logger.info(f"🔧 执行命令 {i}/{len(commands)}: {cmd}")
+                    cmd_result = self._execute_action(cmd)
+                    all_results.append(f"命令{i} ({cmd}):\n{cmd_result}")
+                    
+                    # 如果是patch命令且失败了，停止后续命令
+                    if cmd.startswith("patch ") and "失败" in cmd_result:
+                        logger.warning(f"⚠️ patch命令失败，停止执行后续命令")
+                        break
+                
+                return_value = "\n\n".join(all_results)
+            else:
+                # 单行命令，按原逻辑处理
+                if action == "complete":
+                    self.memory_manager.store_memory("手动标记任务完成")
+                    break
+                
+                # 验证动作格式
+                if not action or len(action) < 2:
+                    logger.warning(f"⚠️ LLM返回的动作无效: '{action}'")
+                    self.add_long_term_memory(f"⚠️ 无效动作: '{action}'")
+                    continue
                 
             # 执行动作
             logger.info(f"🔧 开始执行动作: {action}")
@@ -254,7 +267,7 @@ EOF
                 )
             
             # 智能完成检查 - 结合思考能力和实际文件操作
-            if iteration_count > 3:  # 给足够时间进行分析和修改
+            if iteration_count > 8:  # 给足够时间进行探索、分析和修改
                 # 检查是否有实际的文件修改操作（创建patch文件或应用patch）
                 has_file_operations = any("成功创建patch文件" in memory or "patch" in memory for memory in self.long_term_memories[-10:])
                 
@@ -334,10 +347,6 @@ EOF
                 lines = action.split('\n')
                 if len(lines) >= 3:
                     action = '\n'.join(lines[1:-1]).strip()
-            
-            
-            if '\n' in action and not action.startswith("cat > "):
-                action = action.split('\n')[0].strip()
             
             logger.info(f"🔧 清理后的动作: {action}")
             

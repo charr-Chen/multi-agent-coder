@@ -430,24 +430,29 @@ async def main():
             print("📝 启动单仓库模式...")
             logger.info("使用单仓库模式")
             
+            # 🆕 即使在单仓库模式下，也使用独立的playground仓库管理Issues
+            # 这样可以避免在用户主目录创建.issues.json文件
+            multi_repo_manager = MultiRepoManager("", config["system"]["agent_repos_dir"])
+            playground_git_manager = await multi_repo_manager.setup_playground_repo()
+            
             # 🆕 使用用户指定的仓库路径
             repo_path = user_repo_path
             logger.info(f"使用仓库路径: {repo_path}")
+            logger.info("💡 Issues将在独立的playground仓库中管理，不会影响您的项目目录")
             
-            # 初始化 Git 管理器
-            git_manager = GitManager(repo_path)
-            
-            # 创建评论员代理（使用独立的LLM管理器）
+            # 创建评论员代理（使用playground仓库管理Issues）
             commenter_llm_manager = LLMManager(api_key, proxy_url=proxy_url)
-            commenter = CommenterAgent("commenter", git_manager, commenter_llm_manager)
+            commenter = CommenterAgent("commenter", playground_git_manager, commenter_llm_manager)
             
             # 创建编码员代理（每个使用独立的LLM管理器）
             coders = []
             for i in range(config["system"]["num_coders"]):
                 # 🆕 为每个coder创建独立的LLM管理器，避免并发竞争
                 coder_llm_manager = LLMManager(api_key, proxy_url=proxy_url)
-                # 🆕 在单仓库模式下，使用用户指定的仓库路径
+                # 🆕 在单仓库模式下，使用用户指定的仓库路径，但通过playground管理Issues
                 coder = CoderAgent(f"coder_{i}", coder_llm_manager, user_repo_path)
+                # 设置playground仓库管理器，用于访问Issues
+                coder.set_playground_git_manager(playground_git_manager)
                 coders.append(coder)
         
         # 启动所有代理

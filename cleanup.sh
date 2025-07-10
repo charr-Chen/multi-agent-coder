@@ -44,8 +44,13 @@ fi
 
 read -p "是否清空Issues? (y/n): " clean_issues
 if [[ $clean_issues == "y" || $clean_issues == "Y" ]]; then
-    echo '{"issues": []}' > .issues.json 2>/dev/null
-    echo "✅ 已清空Issues"
+    # 清空playground的issues文件（如果存在）
+    if [ -f "agent_repos/playground/.issues.json" ]; then
+        echo '{"issues": []}' > agent_repos/playground/.issues.json 2>/dev/null
+        echo "✅ 已清空playground Issues"
+    else
+        echo "⏭️  playground Issues文件不存在，跳过"
+    fi
 else
     echo "⏭️  跳过清空Issues"
 fi

@@ -59,9 +59,7 @@ class CoderAgent:
     def add_long_term_memory(self, memory_text: str):
         """添加长期记忆"""
         self.long_term_memories.append(memory_text)
-        # 保持长期记忆在合理范围内
-        if len(self.long_term_memories) > 100:
-            self.long_term_memories = self.long_term_memories[-100:]
+
     
     def set_short_term_memory(self, memory_text: str):
         """设置短期记忆（当前任务上下文）"""
@@ -85,7 +83,7 @@ class CoderAgent:
         iteration_count = 0
         
         # 设置短期记忆为当前任务
-        task_context = f"正在实现Issue: {issue[:200]}..."
+        task_context = f"正在实现Issue: {issue}"
         self.set_short_term_memory(task_context)
         
         # 记录任务开始时的思考
@@ -286,9 +284,7 @@ patch main.py < fix.patch
             # 增加执行结果日志
             if return_value:
                 logger.info(f"📋 动作执行结果 ({len(return_value)}字符):")
-                # 显示前300字符
-                result_preview = return_value[:300] + "..." if len(return_value) > 300 else return_value
-                logger.info(f"   {result_preview}")
+                logger.info(f"   {return_value}")
             else:
                 logger.warning(f"⚠️ 动作执行返回空结果")
             
@@ -306,17 +302,11 @@ patch main.py < fix.patch
                     else:
                         execution_record += f" → ❌ 失败：patch文件未创建"
                 else:
-                    # 对于其他命令，限制输出长度
-                    result_preview = return_value[:100] + "..." if len(return_value) > 100 else return_value
-                    execution_record += f" → {result_preview}"
+                    # 对于其他命令，记录完整输出
+                    execution_record += f" → {return_value}"
             
             self.add_long_term_memory(execution_record)
             
-            # 适度的思考记录，保持思考能力
-            if iteration_count % 3 == 0:  # 每3次迭代记录一次思考
-                await self.memory_manager.record_progress_thinking(
-                    self.llm_manager, issue, action, return_value, iteration_count
-                )
             
             # 智能完成检查 - 结合思考能力和实际文件操作
             if iteration_count > 8:  # 给足够时间进行探索、分析和修改
@@ -512,9 +502,8 @@ patch main.py < fix.patch
             logger.info(f"📝 准备创建patch文件: {patch_filename}")
             logger.info(f"📄 patch内容长度: {len(patch_content)}字符")
             
-            # 显示patch内容预览
-            patch_preview = patch_content[:200] + "..." if len(patch_content) > 200 else patch_content
-            logger.info(f"📖 patch内容预览: {patch_preview}")
+            # 显示patch内容
+            logger.info(f"📖 patch内容: {patch_content}")
             
             # 确保目录存在
             os.makedirs(os.path.dirname(patch_path), exist_ok=True)
@@ -556,7 +545,7 @@ patch main.py < fix.patch
             issue_text = f"标题: {issue.get('title', '')}\n描述: {issue.get('description', '')}"
             
             # 设置短期记忆为当前任务
-            self.set_short_term_memory(f"当前任务: {issue_title} - {issue_desc[:100]}...")
+            self.set_short_term_memory(f"当前任务: {issue_title} - {issue_desc}")
             
             # 调用核心实现方法
             result = await self._implement_issue(issue_text, max_iterations)

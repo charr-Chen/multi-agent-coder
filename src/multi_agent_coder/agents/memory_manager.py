@@ -270,7 +270,7 @@ class MemoryManager:
             
             thinking = await llm_manager._call_llm(thinking_prompt)
             if thinking and thinking.strip():
-                self.store_thinking_process(thinking.strip(), f"任务开始: {task[:100]}...")
+                self.store_thinking_process(thinking.strip(), f"任务开始: {task}")
                 return thinking.strip()
         except Exception as e:
             logger.warning(f"记录任务开始思考失败: {e}")
@@ -284,7 +284,7 @@ class MemoryManager:
 
 任务：{task}
 当前操作：{action}
-操作结果：{result[:200] if result else "无"}
+操作结果：{result if result else "无"}
 当前迭代：{iteration}
 
 请记录：
@@ -324,7 +324,7 @@ class MemoryManager:
             
             thinking = await llm_manager._call_llm(thinking_prompt)
             if thinking and thinking.strip():
-                self.store_thinking_process(thinking.strip(), f"任务完成: {task[:100]}...")
+                self.store_thinking_process(thinking.strip(), f"任务完成: {task}")
                 return thinking.strip()
         except Exception as e:
             logger.warning(f"记录完成思考失败: {e}")
@@ -351,7 +351,7 @@ class MemoryManager:
             
             thinking = await llm_manager._call_llm(thinking_prompt)
             if thinking and thinking.strip():
-                self.store_thinking_process(thinking.strip(), f"任务失败: {task[:100]}...")
+                self.store_thinking_process(thinking.strip(), f"任务失败: {task}")
                 return thinking.strip()
         except Exception as e:
             logger.warning(f"记录失败思考失败: {e}")
